@@ -238,8 +238,8 @@ function FragmentRow({
           (highlight ? "bg-emerald-50/40" : "")
         }
       >
-        <td className="px-3 py-2.5 text-center text-base">{rank}</td>
-        <td className="px-2 py-2.5">
+        <td className="px-3 py-2 text-center text-base">{rank}</td>
+        <td className="px-2 py-2">
           <div className="flex items-center gap-1.5 font-semibold text-slate-800">
             {standing.participant}
             {standing.liveScored > 0 && (
@@ -250,8 +250,8 @@ function FragmentRow({
             {standing.scored} jugados · {standing.exact} exactos · {standing.outcomes} ganador
           </div>
         </td>
-        <td className="px-2 py-2.5 text-center text-slate-600">{standing.exact}</td>
-        <td className="px-3 py-2.5 text-right text-lg font-extrabold text-pitch-700">
+        <td className="px-2 py-2 text-center text-slate-600">{standing.exact}</td>
+        <td className="px-3 py-2 text-right text-lg font-extrabold text-pitch-700">
           {standing.points}
         </td>
       </tr>
@@ -285,37 +285,49 @@ function Detail({
     (a, b) => (order.get(a.match_id) ?? 0) - (order.get(b.match_id) ?? 0)
   );
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
+      {/* Leyenda (una sola vez): aclara el orden pronóstico → resultado */}
+      <div className="flex items-center justify-end gap-1 pr-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+        tu pronóstico <span className="text-slate-300">→</span> resultado
+      </div>
       {rows.map((d) => {
         const m = matchById(d.match_id);
         const res = results[d.match_id];
         if (!m || !res) return null;
         const h = team(m.home);
         const a = team(m.away);
+        const live = d.state === "live";
         return (
           <div
             key={d.match_id}
             className="flex items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-1.5 text-xs"
           >
             <span className="flex min-w-0 items-center gap-1.5 truncate text-slate-600">
-              <Flag team={h} width={18} />
+              <Flag team={h} width={16} />
               <span className="truncate">
-                {h.name} vs {a.name}
+                {h.name} <span className="text-slate-300">vs</span> {a.name}
               </span>
-              <Flag team={a} width={18} />
+              <Flag team={a} width={16} />
             </span>
-            <span className="flex shrink-0 items-center gap-2">
-              {d.state === "live" && (
-                <span className="rounded bg-red-100 px-1 py-0.5 text-[10px] font-bold uppercase text-red-600">
-                  vivo
-                </span>
-              )}
-              <span className="text-slate-400">
-                Tú {d.home}–{d.away} · {res.home}–{res.away}
+            <span className="flex shrink-0 items-center gap-1">
+              {/* Pronóstico: apagado (lo que dijiste) */}
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold tabular-nums text-slate-500">
+                {d.home}-{d.away}
+              </span>
+              <span className="px-0.5 text-slate-300">→</span>
+              {/* Resultado: resaltado (lo que pasó); rojo si va en vivo */}
+              <span
+                className={
+                  "flex items-center gap-1 rounded px-1.5 py-0.5 font-bold tabular-nums text-white " +
+                  (live ? "bg-red-600" : "bg-slate-700")
+                }
+              >
+                {live && <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/90" />}
+                {res.home}-{res.away}
               </span>
               <span
                 className={
-                  "min-w-[34px] rounded px-1.5 py-0.5 text-center font-semibold " +
+                  "ml-0.5 min-w-[30px] rounded px-1.5 py-0.5 text-center font-bold " +
                   (d.pts >= 3
                     ? "bg-pitch-700 text-white"
                     : d.pts === 1
