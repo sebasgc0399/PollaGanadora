@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getAdminClient, isServerConfigured } from "@/lib/supabaseAdmin";
 import { matchById } from "@/lib/matches";
+import type { ResultRow } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,17 +16,28 @@ function isValidGoals(n: unknown): n is number {
   return typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= 99;
 }
 
-export async function POST(req: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const adminPin = process.env.ADMIN_PIN;
+// GET: lista de resultados (públicos) para precargar el panel Admin.
+export async function GET() {
+  if (!isServerConfigured()) {
+    return NextResponse.json({ error: "Servidor sin configurar." }, { status: 500 });
+  }
+  const sb = getAdminClient();
+  const { data, error } = await sb.from("results").select("match_id,home,away");
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const results: Record<string, ResultRow> = {};
+  (data ?? []).forEach((r: ResultRow) => (results[r.match_id] = r));
+  return NextResponse.json({ ok: true, results });
+}
 
-  if (!url || !serviceKey) {
+// POST: el admin carga/borra resultados (protegido por ADMIN_PIN).
+export async function POST(req: NextRequest) {
+  if (!isServerConfigured()) {
     return NextResponse.json(
       { error: "Servidor sin configurar: falta SUPABASE_SERVICE_ROLE_KEY." },
       { status: 500 }
     );
   }
+  const adminPin = process.env.ADMIN_PIN;
   if (!adminPin) {
     return NextResponse.json(
       { error: "Servidor sin configurar: falta ADMIN_PIN." },
@@ -57,9 +69,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const supabase = createClient(url, serviceKey, {
-    auth: { persistSession: false },
-  });
+  const supabase = getAdminClient();
 
   try {
     if (toUpsert.length > 0) {
@@ -69,10 +79,7 @@ export async function POST(req: NextRequest) {
       if (error) throw error;
     }
     if (toDelete.length > 0) {
-      const { error } = await supabase
-        .from("results")
-        .delete()
-        .in("match_id", toDelete);
+      const { error } = await supabase.from("results").delete().in("match_id", toDelete);
       if (error) throw error;
     }
   } catch (e: any) {

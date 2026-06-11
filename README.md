@@ -1,11 +1,11 @@
 # ⚽ Polla Ganadora · Mundial 2026
 
 Polla (quiniela) para la **fase de grupos del Mundial 2026**. Cada participante
-escribe su nombre y predice el marcador de los 72 partidos. A medida que se
-juegan, el administrador carga los resultados reales y la tabla de posiciones se
-calcula sola.
+escribe su nombre + una clave personal y predice el marcador de los 72 partidos.
+A medida que se juegan, el administrador carga los resultados reales y la tabla
+de posiciones se calcula sola.
 
-**No hay que crear cuenta**: solo poner el nombre y diligenciar los marcadores.
+**Sin cuentas de correo**: solo nombre + clave personal.
 
 ## 🏆 Reglas de puntaje
 
@@ -16,41 +16,55 @@ calcula sola.
 | **Acertaste el ganador** pero no el marcador exacto | **1** |
 | Fallaste el resultado | **0** |
 
-La lógica está en [`lib/scoring.ts`](lib/scoring.ts).
+Lógica en [`lib/scoring.ts`](lib/scoring.ts).
+
+## 🔒 Seguridad (importante)
+
+Diseñado para que **nadie haga trampa**:
+
+- **Nada se escribe ni se lee desde el navegador directo.** Toda la base está
+  cerrada con RLS sin acceso para la clave pública; el acceso ocurre **solo en el
+  servidor** (rutas de Next.js) con la `service_role`, que nunca llega al cliente.
+- **Clave personal por participante** (guardada con hash `scrypt`, nunca en texto
+  plano). Solo tú, con tu clave, puedes ver o editar tus marcadores.
+- **Bloqueo por tiempo validado en el servidor**: la edición de un partido se
+  cierra **1 hora antes del pitazo**. No se puede saltar cambiando el reloj del
+  navegador ni llamando a la API directo.
+- **Fallback del admin**: si el administrador ya cargó el resultado de un partido,
+  ese partido queda bloqueado igual (aunque el horario estuviera mal).
+- **La tabla solo revela predicciones de partidos ya jugados** — no se pueden
+  espiar las apuestas futuras de los demás.
 
 ## ✨ Páginas
 
 - **`/`** — Inicio con las reglas.
-- **`/jugar`** — Pones tu nombre y predices los 72 marcadores. Puedes volver a
-  editar mientras el partido no tenga resultado cargado.
+- **`/jugar`** — Nombre + clave; predices los 72 marcadores. Editable hasta 1h
+  antes de cada partido.
 - **`/tabla`** — Ranking en vivo. Toca un participante para ver su detalle.
-- **`/admin`** — Solo el administrador (protegido por PIN): carga los resultados
-  reales.
+- **`/admin`** — Solo administrador (PIN): carga los resultados reales.
 
 ## 🧱 Tecnología
 
 - [Next.js 14](https://nextjs.org) (App Router) + TypeScript
 - [Tailwind CSS](https://tailwindcss.com)
-- [Supabase](https://supabase.com) (PostgreSQL) para guardar predicciones y resultados
+- [Supabase](https://supabase.com) (PostgreSQL) — acceso solo desde el servidor
 - Despliegue en [Vercel](https://vercel.com)
 
 ---
 
 ## 🚀 Puesta en marcha
 
-### 1. Crear la base de datos en Supabase
+### 1. Base de datos en Supabase
 
-1. Entra a [supabase.com](https://supabase.com) y crea un proyecto (plan gratis).
-2. Ve a **SQL Editor → New query**, pega el contenido de
-   [`supabase/schema.sql`](supabase/schema.sql) y dale **Run**.
-3. Ve a **Project Settings → API** y copia:
+1. Crea un proyecto (plan gratis) en [supabase.com](https://supabase.com).
+2. **SQL Editor → New query**, pega [`supabase/schema.sql`](supabase/schema.sql) y
+   dale **Run**. Es seguro re-ejecutarlo; si ya tenías una versión anterior, este
+   script **cierra los permisos abiertos** (paso clave de seguridad).
+3. **Project Settings → API**, copia:
    - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
-   - **anon public** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - **service_role** (¡secreta!) → `SUPABASE_SERVICE_ROLE_KEY`
 
 ### 2. Variables de entorno
-
-Copia el ejemplo y rellena los valores:
 
 ```bash
 cp .env.local.example .env.local
@@ -58,13 +72,12 @@ cp .env.local.example .env.local
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 ADMIN_PIN=elpinquequieras
 ```
 
-> ⚠️ `SUPABASE_SERVICE_ROLE_KEY` y `ADMIN_PIN` **nunca** llevan el prefijo
-> `NEXT_PUBLIC_`: son secretos del servidor.
+> ⚠️ `SUPABASE_SERVICE_ROLE_KEY` y `ADMIN_PIN` **nunca** llevan `NEXT_PUBLIC_`.
+> La antigua `anon key` ya no se usa.
 
 ### 3. Correr localmente
 
@@ -79,48 +92,34 @@ Abre <http://localhost:3000>.
 
 ## ☁️ Desplegar en Vercel
 
-```bash
-git init
-git add .
-git commit -m "Polla Ganadora"
-git branch -M main
-git remote add origin https://github.com/sebasgc0399/PollaGanadora.git
-git push -u origin main
-```
-
-Luego, en [vercel.com](https://vercel.com):
-
-1. **Add New → Project** e importa el repo `PollaGanadora`.
-2. En **Environment Variables** agrega las 4 variables del paso 2
-   (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-   `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_PIN`).
-3. **Deploy**. Vercel detecta Next.js automáticamente.
-
-> Si cambias variables de entorno después del primer deploy, haz **Redeploy**
-> para que tomen efecto.
+1. `git push` del repo a GitHub.
+2. En [vercel.com](https://vercel.com): **Add New → Project**, importa el repo.
+3. **Environment Variables**: agrega `NEXT_PUBLIC_SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY` y `ADMIN_PIN`.
+4. **Deploy**. (Si cambias variables luego, haz **Redeploy**.)
 
 ---
 
-## 🛠️ Editar los partidos
+## 🛠️ Editar partidos y horarios
 
-Todos los partidos viven en [`lib/matches.ts`](lib/matches.ts). Si la FIFA cambia
-una fecha o un cruce, edita ahí. **No cambies los `id` (`m01`…`m72`)** de los
-partidos que ya tengan predicciones o resultados guardados, porque la base de
-datos los referencia por ese `id`.
+Los 72 partidos y sus horarios están en [`lib/matches.ts`](lib/matches.ts). El
+campo `kickoff` es el pitazo inicial en **hora del Este (ET, UTC-04:00 en junio)**;
+de ahí se calcula el bloqueo de 1h antes. Los horarios se cotejaron entre ESPN y
+worldcupwiki (best-effort): **verifícalos** y edita si la FIFA cambia algo. **No
+cambies los `id` (`m01`…`m72`)** de partidos que ya tengan datos guardados.
+
+El minuto de cierre se ajusta con `LOCK_MINUTES_BEFORE` en ese mismo archivo.
 
 ## 👮 Uso del panel Admin
 
-1. Entra a `/admin`.
-2. Escribe el `ADMIN_PIN`.
-3. Llena el marcador real de los partidos jugados y dale **Guardar resultados**.
-4. La tabla se actualiza sola. Para **borrar** un resultado, deja ese partido en
+1. Entra a `/admin`, escribe el `ADMIN_PIN`.
+2. Llena el marcador real de los partidos jugados → **Guardar resultados**.
+3. La tabla se actualiza sola. Para **borrar** un resultado, deja ese partido en
    blanco y guarda.
 
 ## ℹ️ Notas
 
-- Como no hay cuentas, los participantes se identifican por el **nombre** que
-  escriben. Pide a todos usar siempre el mismo nombre para no duplicarse.
-- Un partido queda **bloqueado** para editar predicciones en `/jugar` cuando ya
-  tiene resultado cargado.
-- El fixture proviene del sorteo del 5 de diciembre de 2025 (fuentes: FIFA, ESPN,
-  Al Jazeera). Verifica fechas/cruces antes de arrancar la polla.
+- Cada participante se identifica por **nombre + clave**. Si alguien usa un nombre
+  que ya existe pero con otra clave, **no puede entrar** (no puede pisar al otro).
+- Limitación conocida: no hay límite de intentos de clave (es una polla entre
+  amigos). Si quieres más, se puede añadir rate-limiting.

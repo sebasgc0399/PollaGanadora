@@ -1,6 +1,6 @@
 "use client";
 
-import { Match, team, formatMatchDate } from "@/lib/matches";
+import { Match, team, formatMatchDate, formatKickoffTime } from "@/lib/matches";
 import Flag from "@/components/Flag";
 
 interface Props {
@@ -47,7 +47,9 @@ export default function MatchScoreRow({
         <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-500">
           Grupo {match.group}
         </span>
-        <span className="capitalize">{formatMatchDate(match.date)}</span>
+        <span className="capitalize">
+          {formatMatchDate(match.date)} · {formatKickoffTime(match.kickoff)}
+        </span>
       </div>
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">

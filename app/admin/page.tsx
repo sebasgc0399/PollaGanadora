@@ -2,15 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { MATCHES, GROUPS } from "@/lib/matches";
-import { getSupabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import MatchScoreRow from "@/components/MatchScoreRow";
-import type { ResultRow } from "@/lib/types";
 
 type Sc = { home: string; away: string };
 type Msg = { type: "ok" | "err" | "info"; text: string };
 
 export default function AdminPage() {
-  const configured = isSupabaseConfigured();
   const [pin, setPin] = useState("");
   const [scores, setScores] = useState<Record<string, Sc>>({});
   const [initialIds, setInitialIds] = useState<Set<string>>(new Set());
@@ -30,21 +27,14 @@ export default function AdminPage() {
   }, []);
 
   async function load() {
-    if (!configured) {
-      setLoading(false);
-      setMsg({ type: "err", text: "La base de datos aún no está configurada (mira el README)." });
-      return;
-    }
     setLoading(true);
     try {
-      const sb = getSupabase();
-      const { data, error } = await sb
-        .from("results")
-        .select("match_id,home,away");
-      if (error) throw error;
+      const res = await fetch("/api/resultados", { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Error cargando resultados.");
       const map: Record<string, Sc> = {};
       const ids = new Set<string>();
-      (data ?? []).forEach((r: ResultRow) => {
+      Object.values(data.results ?? {}).forEach((r: any) => {
         map[r.match_id] = { home: String(r.home), away: String(r.away) };
         ids.add(r.match_id);
       });

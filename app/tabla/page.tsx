@@ -1,103 +1,55 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { MATCHES, team } from "@/lib/matches";
+import { useCallback, useEffect, useState } from "react";
+import { MATCHES, matchById, team } from "@/lib/matches";
 import Flag from "@/components/Flag";
-import { getSupabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { pointsFor, hitLabel, type Score } from "@/lib/scoring";
-import type { PredictionRow, ResultRow } from "@/lib/types";
+import type { ResultRow } from "@/lib/types";
 
+interface DetailRow {
+  match_id: string;
+  home: number;
+  away: number;
+  pts: number;
+  label: string;
+}
 interface Standing {
   participant: string;
   points: number;
   exact: number;
   draws: number;
   outcomes: number;
-  scored: number; // partidos con resultado que el jugador predijo
+  scored: number;
+  detail: DetailRow[];
 }
 
 export default function TablaPage() {
-  const configured = isSupabaseConfigured();
-  const [preds, setPreds] = useState<PredictionRow[]>([]);
+  const [standings, setStandings] = useState<Standing[]>([]);
   const [results, setResults] = useState<Record<string, ResultRow>>({});
+  const [resultsCount, setResultsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!configured) {
-      setLoading(false);
-      setError("La base de datos aún no está configurada (mira el README).");
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
-      const sb = getSupabase();
-      const [predRes, resRes] = await Promise.all([
-        sb.from("predictions").select("participant,match_id,home,away"),
-        sb.from("results").select("match_id,home,away"),
-      ]);
-      if (predRes.error) throw predRes.error;
-      if (resRes.error) throw resRes.error;
-
-      setPreds((predRes.data ?? []) as PredictionRow[]);
-      const rmap: Record<string, ResultRow> = {};
-      (resRes.data ?? []).forEach((r: ResultRow) => (rmap[r.match_id] = r));
-      setResults(rmap);
+      const res = await fetch("/api/tabla", { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Error cargando la tabla.");
+      setStandings(data.standings ?? []);
+      setResults(data.results ?? {});
+      setResultsCount(data.resultsCount ?? 0);
     } catch (e: any) {
       setError(e?.message ?? "Error cargando la tabla.");
     } finally {
       setLoading(false);
     }
-  }, [configured]);
+  }, []);
 
   useEffect(() => {
     load();
   }, [load]);
-
-  // predicciones agrupadas por participante
-  const byParticipant = useMemo(() => {
-    const map = new Map<string, Record<string, Score>>();
-    for (const p of preds) {
-      if (!map.has(p.participant)) map.set(p.participant, {});
-      map.get(p.participant)![p.match_id] = { home: p.home, away: p.away };
-    }
-    return map;
-  }, [preds]);
-
-  const standings = useMemo<Standing[]>(() => {
-    const rows: Standing[] = [];
-    for (const [participant, matches] of byParticipant) {
-      let points = 0,
-        exact = 0,
-        draws = 0,
-        outcomes = 0,
-        scored = 0;
-      for (const [mid, pred] of Object.entries(matches)) {
-        const res = results[mid];
-        if (!res) continue;
-        scored++;
-        const pts = pointsFor(pred, res);
-        points += pts;
-        const label = hitLabel(pred, res);
-        if (label === "exacto") exact++;
-        else if (label === "empate") draws++;
-        else if (label === "ganador") outcomes++;
-      }
-      rows.push({ participant, points, exact, draws, outcomes, scored });
-    }
-    rows.sort(
-      (a, b) =>
-        b.points - a.points ||
-        b.exact - a.exact ||
-        b.draws + b.outcomes - (a.draws + a.outcomes) ||
-        a.participant.localeCompare(b.participant)
-    );
-    return rows;
-  }, [byParticipant, results]);
-
-  const resultsCount = Object.keys(results).length;
 
   const medal = (i: number) => (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`);
 
@@ -159,10 +111,7 @@ export default function TablaPage() {
                     rank={medal(i)}
                     highlight={i < 3}
                     open={open}
-                    onToggle={() =>
-                      setExpanded(open ? null : s.participant)
-                    }
-                    predictions={byParticipant.get(s.participant) ?? {}}
+                    onToggle={() => setExpanded(open ? null : s.participant)}
                     results={results}
                   />
                 );
@@ -173,8 +122,9 @@ export default function TablaPage() {
       )}
 
       <p className="text-center text-xs text-slate-400">
-        Los puntos se actualizan a medida que el administrador carga los resultados
-        reales. Toca un participante para ver el detalle.
+        Los puntos se actualizan a medida que el administrador carga los resultados.
+        Toca un participante para ver su detalle. Solo se muestran las predicciones de
+        partidos ya jugados.
       </p>
     </div>
   );
@@ -186,7 +136,6 @@ function FragmentRow({
   highlight,
   open,
   onToggle,
-  predictions,
   results,
 }: {
   standing: Standing;
@@ -194,7 +143,6 @@ function FragmentRow({
   highlight: boolean;
   open: boolean;
   onToggle: () => void;
-  predictions: Record<string, Score>;
   results: Record<string, ResultRow>;
 }) {
   return (
@@ -221,7 +169,7 @@ function FragmentRow({
       {open && (
         <tr className="bg-slate-50">
           <td colSpan={4} className="px-3 py-3">
-            <Detail predictions={predictions} results={results} />
+            <Detail detail={standing.detail} results={results} />
           </td>
         </tr>
       )}
@@ -230,32 +178,35 @@ function FragmentRow({
 }
 
 function Detail({
-  predictions,
+  detail,
   results,
 }: {
-  predictions: Record<string, Score>;
+  detail: DetailRow[];
   results: Record<string, ResultRow>;
 }) {
-  const rows = MATCHES.filter((m) => results[m.id] && predictions[m.id]);
-  if (rows.length === 0) {
+  if (!detail || detail.length === 0) {
     return (
       <p className="text-center text-xs text-slate-400">
-        Aún no hay partidos con resultado para este participante.
+        Aún no hay partidos jugados de este participante.
       </p>
     );
   }
+  // ordenar por el orden del fixture
+  const order = new Map(MATCHES.map((m, i) => [m.id, i]));
+  const rows = [...detail].sort(
+    (a, b) => (order.get(a.match_id) ?? 0) - (order.get(b.match_id) ?? 0)
+  );
   return (
     <div className="space-y-1.5">
-      {rows.map((m) => {
-        const pred = predictions[m.id];
-        const res = results[m.id];
-        const pts = pointsFor(pred, res);
-        const label = hitLabel(pred, res);
+      {rows.map((d) => {
+        const m = matchById(d.match_id);
+        const res = results[d.match_id];
+        if (!m || !res) return null;
         const h = team(m.home);
         const a = team(m.away);
         return (
           <div
-            key={m.id}
+            key={d.match_id}
             className="flex items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-1.5 text-xs"
           >
             <span className="flex min-w-0 items-center gap-1.5 truncate text-slate-600">
@@ -267,19 +218,19 @@ function Detail({
             </span>
             <span className="flex shrink-0 items-center gap-2">
               <span className="text-slate-400">
-                Tú {pred.home}–{pred.away} · Real {res.home}–{res.away}
+                Tú {d.home}–{d.away} · Real {res.home}–{res.away}
               </span>
               <span
                 className={
-                  "min-w-[44px] rounded px-1.5 py-0.5 text-center font-semibold " +
-                  (pts >= 3
+                  "min-w-[34px] rounded px-1.5 py-0.5 text-center font-semibold " +
+                  (d.pts >= 3
                     ? "bg-pitch-700 text-white"
-                    : pts === 1
+                    : d.pts === 1
                     ? "bg-emerald-100 text-emerald-700"
                     : "bg-slate-200 text-slate-500")
                 }
               >
-                +{pts} {label !== "fallo" ? "" : ""}
+                +{d.pts}
               </span>
             </span>
           </div>

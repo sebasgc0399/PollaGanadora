@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { MATCHES } from "@/lib/matches";
-import { isSupabaseConfigured } from "@/lib/supabaseClient";
+import { isServerConfigured } from "@/lib/supabaseAdmin";
 
 function RuleCard({
   points,
@@ -29,7 +29,7 @@ function RuleCard({
 }
 
 export default function HomePage() {
-  const configured = isSupabaseConfigured();
+  const configured = isServerConfigured();
 
   return (
     <div className="space-y-8">
@@ -65,10 +65,11 @@ export default function HomePage() {
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
           <p className="font-semibold">⚠️ Falta conectar la base de datos</p>
           <p className="mt-1">
-            Define <code className="font-mono">NEXT_PUBLIC_SUPABASE_URL</code> y{" "}
-            <code className="font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> (mira
-            el archivo <code className="font-mono">README.md</code>). Mientras
-            tanto la app se ve pero no guarda datos.
+            Define <code className="font-mono">NEXT_PUBLIC_SUPABASE_URL</code>,{" "}
+            <code className="font-mono">SUPABASE_SERVICE_ROLE_KEY</code> y{" "}
+            <code className="font-mono">ADMIN_PIN</code> (mira el archivo{" "}
+            <code className="font-mono">README.md</code>). Mientras tanto la app se
+            ve pero no guarda datos.
           </p>
         </div>
       )}

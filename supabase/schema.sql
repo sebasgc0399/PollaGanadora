@@ -1,13 +1,27 @@
 -- ===========================================================================
--- Polla Ganadora · Esquema de base de datos (Supabase / PostgreSQL)
+-- Polla Ganadora · Esquema de base de datos (Supabase / PostgreSQL)  v2 SEGURO
 --
 -- Cómo usarlo:
 --   1. Entra a tu proyecto en https://supabase.com
 --   2. Abre "SQL Editor" → "New query"
 --   3. Pega TODO este archivo y dale "Run".
 --
--- Es seguro re-ejecutarlo: usa "if not exists" / "drop policy if exists".
+-- Es seguro re-ejecutarlo. SI YA HABÍAS CORRIDO LA VERSIÓN ANTERIOR, este script
+-- cierra los permisos abiertos (el navegador ya NO puede leer/escribir directo).
+--
+-- Modelo de seguridad:
+--   • RLS activado en TODAS las tablas SIN políticas para el rol anónimo →
+--     la clave pública (anon) queda sin acceso a los datos.
+--   • Todo el acceso ocurre en el servidor (route handlers de Next.js) con la
+--     clave service_role, que ignora RLS. Esa clave nunca llega al navegador.
 -- ===========================================================================
+
+-- Participantes: nombre + clave personal (guardada como hash, nunca en texto plano).
+create table if not exists public.participants (
+  name       text primary key,
+  clave_hash text not null,
+  created_at timestamptz not null default now()
+);
 
 -- Predicciones: una fila por (participante, partido).
 create table if not exists public.predictions (
@@ -27,31 +41,24 @@ create table if not exists public.results (
   updated_at timestamptz not null default now()
 );
 
--- Seguridad por filas (RLS) activada en ambas tablas.
-alter table public.predictions enable row level security;
-alter table public.results     enable row level security;
+-- RLS activado en todas.
+alter table public.participants enable row level security;
+alter table public.predictions  enable row level security;
+alter table public.results      enable row level security;
 
 -- ---------------------------------------------------------------------------
--- Predicciones: como no hay cuentas, cualquiera (clave anónima) puede leer,
--- insertar y actualizar su propia predicción por nombre.
+-- Cerrar TODO acceso del rol anónimo: borramos cualquier política previa.
+-- Con RLS activado y sin políticas, el rol "anon" no puede ni leer ni escribir.
+-- El servidor usa service_role, que ignora RLS por completo.
 -- ---------------------------------------------------------------------------
 drop policy if exists "predictions_select" on public.predictions;
 drop policy if exists "predictions_insert" on public.predictions;
 drop policy if exists "predictions_update" on public.predictions;
+drop policy if exists "results_select"     on public.results;
 
-create policy "predictions_select" on public.predictions
-  for select using (true);
-create policy "predictions_insert" on public.predictions
-  for insert with check (true);
-create policy "predictions_update" on public.predictions
-  for update using (true) with check (true);
+-- (No creamos ninguna política nueva: acceso solo vía service_role en el servidor.)
 
--- ---------------------------------------------------------------------------
--- Resultados: cualquiera puede LEER, pero escribir solo se permite desde el
--- servidor con la "service role key" (que ignora RLS). Así nadie puede
--- manipular los resultados reales desde el navegador.
--- ---------------------------------------------------------------------------
-drop policy if exists "results_select" on public.results;
-
-create policy "results_select" on public.results
-  for select using (true);
+-- Revocar privilegios directos de los roles públicos por si acaso.
+revoke all on public.participants from anon, authenticated;
+revoke all on public.predictions  from anon, authenticated;
+revoke all on public.results      from anon, authenticated;
