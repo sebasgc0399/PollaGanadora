@@ -9,6 +9,8 @@ interface Props {
   away: string;
   onChange: (home: string, away: string) => void;
   disabled?: boolean;
+  /** Texto de cuenta regresiva, p.ej. "3h 20m" (se muestra solo si está editable). */
+  closesIn?: string;
   /** Contenido extra debajo del marcador (resultado real, puntos, etc.) */
   footer?: React.ReactNode;
 }
@@ -25,6 +27,7 @@ export default function MatchScoreRow({
   away,
   onChange,
   disabled = false,
+  closesIn,
   footer,
 }: Props) {
   const h = team(match.home);
@@ -47,8 +50,15 @@ export default function MatchScoreRow({
         <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-500">
           Grupo {match.group}
         </span>
-        <span className="capitalize">
-          {formatMatchDate(match.date)} · {formatKickoffTime(match.kickoff)}
+        <span className="text-right leading-tight">
+          <span className="block capitalize">
+            {formatMatchDate(match.date)} · {formatKickoffTime(match.kickoff)}
+          </span>
+          {!disabled && closesIn ? (
+            <span className="block text-[11px] font-medium text-amber-600">
+              ⏱ Cierra en {closesIn}
+            </span>
+          ) : null}
         </span>
       </div>
 

@@ -14,17 +14,60 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<Msg | null>(null);
+  const [resetReqs, setResetReqs] = useState<{ name: string; reset_requested_at: string }[]>([]);
 
   useEffect(() => {
+    let stored = "";
     try {
-      const p = localStorage.getItem("pg_admin_pin");
-      if (p) setPin(p);
+      stored = localStorage.getItem("pg_admin_pin") ?? "";
+      if (stored) setPin(stored);
     } catch {
       /* ignore */
     }
     load();
+    if (stored) loadResets(stored);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function loadResets(p = pin) {
+    if (!p.trim()) {
+      return setMsg({ type: "err", text: "Escribe el PIN para ver las solicitudes." });
+    }
+    try {
+      const res = await fetch("/api/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "list", pin: p.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "No se pudieron cargar las solicitudes.");
+      setResetReqs(data.requests ?? []);
+    } catch (e: any) {
+      setMsg({ type: "err", text: e?.message ?? "Error cargando solicitudes." });
+    }
+  }
+
+  async function resolveReset(name: string, action: "approve" | "reject") {
+    try {
+      const res = await fetch("/api/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, pin: pin.trim(), name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "No se pudo procesar.");
+      setMsg({
+        type: "ok",
+        text:
+          action === "approve"
+            ? `Clave de "${name}" reiniciada. Pídele que entre con una clave NUEVA.`
+            : `Solicitud de "${name}" rechazada.`,
+      });
+      loadResets();
+    } catch (e: any) {
+      setMsg({ type: "err", text: e?.message ?? "Error." });
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -163,6 +206,58 @@ export default function AdminPage() {
           {msg.text}
         </div>
       )}
+
+      {/* Solicitudes de reinicio de clave */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="font-bold text-slate-700">
+            Solicitudes de clave
+            {resetReqs.length > 0 && (
+              <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                {resetReqs.length}
+              </span>
+            )}
+          </h2>
+          <button
+            onClick={() => loadResets()}
+            className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
+          >
+            ↻ Revisar
+          </button>
+        </div>
+        {resetReqs.length === 0 ? (
+          <p className="text-sm text-slate-400">No hay solicitudes pendientes.</p>
+        ) : (
+          <ul className="space-y-2">
+            {resetReqs.map((r) => (
+              <li
+                key={r.name}
+                className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2"
+              >
+                <span className="truncate text-sm font-medium text-slate-700">{r.name}</span>
+                <span className="flex shrink-0 gap-2">
+                  <button
+                    onClick={() => resolveReset(r.name, "approve")}
+                    className="rounded-lg bg-pitch-700 px-3 py-1 text-xs font-semibold text-white transition hover:bg-pitch-800"
+                  >
+                    Aprobar
+                  </button>
+                  <button
+                    onClick={() => resolveReset(r.name, "reject")}
+                    className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
+                  >
+                    Rechazar
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-2 text-xs text-slate-400">
+          Aprobar borra la clave del jugador (sus marcadores se conservan) para que vuelva
+          a entrar con una clave nueva.
+        </p>
+      </div>
 
       <p className="text-sm text-slate-500">
         {savedCount}/{MATCHES.length} partidos con resultado.

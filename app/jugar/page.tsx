@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { MATCHES, GROUPS, lockTimeMs } from "@/lib/matches";
+import { MATCHES, GROUPS, lockTimeMs, formatRemaining } from "@/lib/matches";
 import MatchScoreRow from "@/components/MatchScoreRow";
 import { pointsFor, hitLabel } from "@/lib/scoring";
 
@@ -19,6 +19,7 @@ export default function JugarPage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<Msg | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [resetOpen, setResetOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -68,6 +69,29 @@ export default function JugarPage() {
       setMsg({ type: "err", text: e?.message ?? "Error al ingresar." });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function requestReset() {
+    const n = name.trim();
+    if (n.length < 2) {
+      return setMsg({ type: "err", text: "Escribe tu nombre arriba primero." });
+    }
+    try {
+      const res = await fetch("/api/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "request", name: n }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "No se pudo enviar la solicitud.");
+      setResetOpen(false);
+      setMsg({
+        type: "ok",
+        text: "Solicitud enviada. Cuando el admin la apruebe, entra con tu nombre y una clave NUEVA (tus marcadores no se pierden).",
+      });
+    } catch (e: any) {
+      setMsg({ type: "err", text: e?.message ?? "No se pudo enviar." });
     }
   }
 
@@ -180,9 +204,36 @@ export default function JugarPage() {
 
         {msg && <Banner msg={msg} />}
 
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => setResetOpen((v) => !v)}
+            className="text-sm font-medium text-pitch-700 underline"
+          >
+            ¿Olvidaste tu clave?
+          </button>
+        </div>
+
+        {resetOpen && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            <p className="mb-2">
+              Escribe tu nombre arriba (igual al que usaste) y pide un reinicio. El
+              administrador lo aprueba y luego entras con una <strong>clave nueva</strong>.
+              Tus marcadores guardados <strong>no se pierden</strong>.
+            </p>
+            <button
+              type="button"
+              onClick={requestReset}
+              className="w-full rounded-lg bg-slate-700 px-4 py-2 font-semibold text-white transition hover:bg-slate-800"
+            >
+              Pedir reinicio de mi clave
+            </button>
+          </div>
+        )}
+
         <p className="text-center text-xs text-slate-400">
           Si te equivocas de clave para un nombre que ya existe, no podrás entrar: usa tu
-          clave o elige otro nombre.
+          clave o pide un reinicio.
         </p>
       </div>
     );
@@ -231,6 +282,7 @@ export default function JugarPage() {
                   home={p.home}
                   away={p.away}
                   disabled={locked}
+                  closesIn={!locked ? formatRemaining(lockTimeMs(m) - now) : undefined}
                   onChange={(h, a) => setPred(m.id, h, a)}
                   footer={
                     result ? (

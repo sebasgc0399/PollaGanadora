@@ -116,6 +116,20 @@ El minuto de cierre se ajusta con `LOCK_MINUTES_BEFORE` en ese mismo archivo.
 2. Llena el marcador real de los partidos jugados → **Guardar resultados**.
 3. La tabla se actualiza sola. Para **borrar** un resultado, deja ese partido en
    blanco y guarda.
+4. **Solicitudes de clave**: si alguien olvidó su clave, aparece aquí. Al
+   **Aprobar**, se borra su clave (sus marcadores se conservan) y la persona
+   vuelve a entrar con una clave nueva.
+
+## 🔁 "Olvidé mi clave"
+
+En `/jugar` hay un enlace **¿Olvidaste tu clave?**: el jugador escribe su nombre y
+pide un reinicio. El admin lo aprueba en `/admin` → la persona entra de nuevo con
+su nombre y una **clave nueva**, y sus predicciones reaparecen (no se pierden).
+
+## ⏱️ Cuenta regresiva
+
+Cada partido editable muestra **"Cierra en 3h 20m"** (se cierra 1h antes del
+pitazo) y se actualiza solo.
 
 ## ℹ️ Notas
 
@@ -123,3 +137,6 @@ El minuto de cierre se ajusta con `LOCK_MINUTES_BEFORE` en ese mismo archivo.
   que ya existe pero con otra clave, **no puede entrar** (no puede pisar al otro).
 - Limitación conocida: no hay límite de intentos de clave (es una polla entre
   amigos). Si quieres más, se puede añadir rate-limiting.
+
+> Si actualizas desde una versión anterior, **vuelve a correr** `supabase/schema.sql`
+> (agrega la columna `reset_requested_at`, segura de re-ejecutar).

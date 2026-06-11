@@ -23,6 +23,10 @@ create table if not exists public.participants (
   created_at timestamptz not null default now()
 );
 
+-- Solicitud de "olvidé mi clave": el jugador la pide y el admin la aprueba.
+alter table public.participants
+  add column if not exists reset_requested_at timestamptz;
+
 -- Predicciones: una fila por (participante, partido).
 create table if not exists public.predictions (
   participant text   not null,
