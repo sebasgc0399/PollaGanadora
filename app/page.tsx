@@ -32,7 +32,7 @@ export default function HomePage() {
   const configured = isServerConfigured();
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-3xl space-y-8">
       <section className="rounded-2xl bg-gradient-to-br from-pitch-700 to-emerald-600 p-6 text-white shadow-lg sm:p-8">
         <p className="text-sm font-medium uppercase tracking-widest text-emerald-100">
           Mundial 2026 · Fase de grupos

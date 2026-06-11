@@ -407,158 +407,167 @@ export default function JugarPage() {
   const pct = Math.round((filledCount / MATCHES.length) * 100);
 
   return (
-    <div className="space-y-4 pb-28">
-      {/* Cabecera con progreso y puntos */}
-      <div className="space-y-2">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-extrabold text-slate-800">
-              Hola, <span className="text-pitch-700">{name.trim()}</span>
-            </h1>
-            <p className="text-sm text-slate-500">
-              {me ? (
-                <>
-                  Llevas <span className="font-bold text-pitch-700">{me.points} pts</span>
-                  {me.rank ? ` · vas #${me.rank} de ${me.total}` : ""}
-                </>
-              ) : (
-                "Cargando puntos…"
-              )}
-            </p>
+    <>
+      <div className="mx-auto max-w-6xl pb-28 lg:grid lg:grid-cols-[290px_1fr] lg:gap-6 lg:items-start">
+        {/* ---------- Barra lateral ---------- */}
+        <aside className="space-y-3 lg:sticky lg:top-[73px] lg:self-start">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h1 className="truncate text-lg font-extrabold text-slate-800">
+                  Hola, <span className="text-pitch-700">{name.trim()}</span>
+                </h1>
+                <p className="text-sm text-slate-500">
+                  {me ? (
+                    <>
+                      Llevas <span className="font-bold text-pitch-700">{me.points} pts</span>
+                      {me.rank ? ` · #${me.rank} de ${me.total}` : ""}
+                    </>
+                  ) : (
+                    "Cargando puntos…"
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setStage("login");
+                  setClave("");
+                  setMsg(null);
+                }}
+                className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
+              >
+                Salir
+              </button>
+            </div>
+            <div className="mt-3">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                <div className="h-full rounded-full bg-pitch-600 transition-all" style={{ width: `${pct}%` }} />
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {filledCount}/{MATCHES.length} llenos
+                {editableLeft > 0 ? ` · faltan ${editableLeft}` : " · ¡todo listo!"}
+              </p>
+            </div>
           </div>
-          <button
-            onClick={() => {
-              setStage("login");
-              setClave("");
-              setMsg(null);
-            }}
-            className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
-          >
-            Salir
-          </button>
-        </div>
-        <div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-            <div
-              className="h-full rounded-full bg-pitch-600 transition-all"
-              style={{ width: `${pct}%` }}
+
+          <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <Segmented
+              full
+              value={view}
+              onChange={(v) => changeView(v as View)}
+              options={[
+                ["fecha", "Fecha"],
+                ["grupos", "Grupos"],
+                ["jornada", "Jornada"],
+              ]}
+            />
+            <Segmented
+              full
+              value={filter}
+              onChange={(v) => setFilter(v as Filter)}
+              options={[
+                ["todos", "Todos"],
+                ["pendientes", "Pendientes"],
+                ["hoy", "Hoy"],
+              ]}
+            />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar equipo…"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-pitch-600 focus:ring-2 focus:ring-pitch-600/30"
             />
           </div>
-          <p className="mt-1 text-xs text-slate-500">
-            {filledCount}/{MATCHES.length} llenos
-            {editableLeft > 0 ? ` · te faltan ${editableLeft} por llenar` : " · ¡todo listo!"}
-          </p>
-        </div>
-      </div>
 
-      {filledCount === MATCHES.length && (
-        <div className="animate-pulse rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-center text-sm font-semibold text-emerald-800">
-          🎉 ¡Completaste los {MATCHES.length} partidos! 🎉
-        </div>
-      )}
+          {sections.length > 1 && (
+            <nav className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+              <p className="px-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                Ir a
+              </p>
+              <div className="flex gap-1.5 overflow-x-auto pb-1 lg:max-h-[42vh] lg:flex-col lg:overflow-y-auto lg:pb-0">
+                {sections.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => scrollToSection(s.id)}
+                    className={
+                      "shrink-0 rounded-lg border px-2.5 py-1 text-xs font-medium transition lg:w-full lg:text-left " +
+                      (s.isToday
+                        ? "border-pitch-600 bg-pitch-50 text-pitch-800"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100")
+                    }
+                  >
+                    {s.label}
+                    {s.isToday ? " · hoy" : ""}
+                  </button>
+                ))}
+              </div>
+            </nav>
+          )}
+        </aside>
 
-      {msg && <Banner msg={msg} />}
+        {/* ---------- Contenido ---------- */}
+        <main className="mt-4 space-y-4 lg:mt-0">
+          {filledCount === MATCHES.length && (
+            <div className="animate-pulse rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-center text-sm font-semibold text-emerald-800">
+              🎉 ¡Completaste los {MATCHES.length} partidos! 🎉
+            </div>
+          )}
 
-      {/* Controles: vista, filtro, búsqueda */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Segmented
-            value={view}
-            onChange={(v) => changeView(v as View)}
-            options={[
-              ["fecha", "Fecha"],
-              ["grupos", "Grupos"],
-              ["jornada", "Jornada"],
-            ]}
-          />
-          <Segmented
-            value={filter}
-            onChange={(v) => setFilter(v as Filter)}
-            options={[
-              ["todos", "Todos"],
-              ["pendientes", "Pendientes"],
-              ["hoy", "Hoy"],
-            ]}
-          />
-        </div>
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar equipo (ej: Colombia)…"
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-pitch-600 focus:ring-2 focus:ring-pitch-600/30"
-        />
-        {/* Chips para saltar a una sección */}
-        {sections.length > 1 && (
-          <div className="flex gap-1.5 overflow-x-auto pb-1">
-            {sections.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => scrollToSection(s.id)}
+          {msg && <Banner msg={msg} />}
+
+          {sections.length === 0 && (
+            <p className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+              No hay partidos que coincidan con el filtro/búsqueda.
+            </p>
+          )}
+
+          {sections.map((s) => (
+            <section key={s.id} id={s.id}>
+              <h2
                 className={
-                  "shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium transition " +
-                  (s.isToday
-                    ? "border-pitch-600 bg-pitch-50 text-pitch-800"
-                    : "border-slate-300 bg-white text-slate-600 hover:bg-slate-100")
+                  "sticky top-[57px] z-10 rounded-lg px-3 py-1.5 text-sm font-bold uppercase tracking-wide shadow-sm backdrop-blur " +
+                  (s.isToday ? "bg-pitch-100/95 text-pitch-800" : "bg-emerald-50/95 text-pitch-800")
                 }
               >
                 {s.label}
                 {s.isToday ? " · hoy" : ""}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {sections.length === 0 && (
-        <p className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
-          No hay partidos que coincidan con el filtro/búsqueda.
-        </p>
-      )}
-
-      {sections.map((s) => (
-        <section key={s.id} id={s.id}>
-          <h2
-            className={
-              "sticky top-[57px] z-10 -mx-4 px-4 py-1.5 text-sm font-bold uppercase tracking-wide backdrop-blur " +
-              (s.isToday ? "bg-pitch-100/95 text-pitch-800" : "bg-emerald-50/95 text-pitch-800")
-            }
-          >
-            {s.label}
-            {s.isToday ? " · hoy" : ""}
-          </h2>
-          <div className="mt-2 space-y-2">
-            {s.matches.map((m) => {
-              const p = preds[m.id] ?? { home: "", away: "" };
-              const locked = isLocked(m);
-              if (locked) {
+              </h2>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {s.matches.map((m) => {
+                const p = preds[m.id] ?? { home: "", away: "" };
+                const locked = isLocked(m);
+                if (locked) {
+                  return (
+                    <div key={m.id} className="sm:col-span-2">
+                      <LockedMatchRow
+                        match={m}
+                        pred={p}
+                        score={scores[m.id] ?? null}
+                        detail={liveDetail[m.id]}
+                      />
+                    </div>
+                  );
+                }
+                const closes = lockTimeMs(m) - now;
                 return (
-                  <LockedMatchRow
+                  <MatchScoreRow
                     key={m.id}
                     match={m}
-                    pred={p}
-                    score={scores[m.id] ?? null}
-                    detail={liveDetail[m.id]}
+                    home={p.home}
+                    away={p.away}
+                    closesIn={formatRemaining(closes)}
+                    urgent={closes < 3 * 3600_000}
+                    status={matchStatus(m)}
+                    onChange={(hh, aa) => setPred(m.id, hh, aa)}
                   />
                 );
-              }
-              const closes = lockTimeMs(m) - now;
-              return (
-                <MatchScoreRow
-                  key={m.id}
-                  match={m}
-                  home={p.home}
-                  away={p.away}
-                  closesIn={formatRemaining(closes)}
-                  urgent={closes < 3 * 3600_000}
-                  status={matchStatus(m)}
-                  onChange={(hh, aa) => setPred(m.id, hh, aa)}
-                />
-              );
-            })}
-          </div>
-        </section>
-      ))}
+              })}
+              </div>
+            </section>
+          ))}
+        </main>
+      </div>
 
       {/* Volver arriba */}
       {showTop && (
@@ -573,7 +582,7 @@ export default function JugarPage() {
 
       {/* Barra inferior: estado de guardado */}
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
           <SaveStatus state={saveState} unsaved={hasUnsaved} />
           <button
             onClick={() => doSave(false)}
@@ -584,7 +593,7 @@ export default function JugarPage() {
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -592,19 +601,27 @@ function Segmented({
   value,
   onChange,
   options,
+  full = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: [string, string][];
+  full?: boolean;
 }) {
   return (
-    <div className="inline-flex rounded-full border border-slate-300 bg-white p-0.5">
+    <div
+      className={
+        "rounded-full border border-slate-300 bg-white p-0.5 " +
+        (full ? "flex w-full" : "inline-flex")
+      }
+    >
       {options.map(([v, label]) => (
         <button
           key={v}
           onClick={() => onChange(v)}
           className={
-            "rounded-full px-3 py-1 font-medium transition " +
+            "rounded-full px-3 py-1 text-sm font-medium transition " +
+            (full ? "flex-1 " : "") +
             (value === v ? "bg-pitch-700 text-white" : "text-slate-600 hover:bg-slate-100")
           }
         >

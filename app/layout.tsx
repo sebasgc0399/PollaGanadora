@@ -34,7 +34,7 @@ export default function RootLayout({
     <html lang="es">
       <body className="min-h-screen bg-gradient-to-b from-slate-50 to-emerald-50 text-slate-900 antialiased">
         <header className="sticky top-0 z-20 border-b border-emerald-900/10 bg-pitch-700 shadow-sm">
-          <nav className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-4 py-3">
+          <nav className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3">
             <Link href="/" className="flex items-center gap-2 text-white">
               <span className="text-xl">⚽</span>
               <span className="font-extrabold tracking-tight">Polla Ganadora</span>
@@ -47,9 +47,9 @@ export default function RootLayout({
           </nav>
         </header>
 
-        <main className="mx-auto w-full max-w-3xl px-4 py-6">{children}</main>
+        <main className="mx-auto w-full max-w-6xl px-4 py-6">{children}</main>
 
-        <footer className="mx-auto max-w-3xl px-4 pb-10 pt-4 text-center text-xs text-slate-400">
+        <footer className="mx-auto max-w-6xl px-4 pb-10 pt-4 text-center text-xs text-slate-400">
           Mundial 2026 · Fase de grupos · Hecho para jugar entre amigos
         </footer>
       </body>

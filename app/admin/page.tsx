@@ -167,7 +167,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="space-y-5 pb-28">
+    <div className="mx-auto max-w-3xl space-y-5 pb-28">
       <div>
         <h1 className="text-2xl font-extrabold text-slate-800">Cargar resultados</h1>
         <p className="text-sm text-slate-500">
