@@ -1,16 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MATCHES, matchById, team } from "@/lib/matches";
 import Flag from "@/components/Flag";
-import type { ResultRow } from "@/lib/types";
 
+interface EffScore {
+  home: number;
+  away: number;
+  state: "final" | "live";
+}
 interface DetailRow {
   match_id: string;
   home: number;
   away: number;
   pts: number;
   label: string;
+  state: "final" | "live";
 }
 interface Standing {
   participant: string;
@@ -19,36 +24,55 @@ interface Standing {
   draws: number;
   outcomes: number;
   scored: number;
+  liveScored: number;
   detail: DetailRow[];
 }
+interface LiveItem {
+  match_id: string;
+  home: number;
+  away: number;
+  detail: string;
+}
+
+const REFRESH_MS = 45_000;
 
 export default function TablaPage() {
   const [standings, setStandings] = useState<Standing[]>([]);
-  const [results, setResults] = useState<Record<string, ResultRow>>({});
-  const [resultsCount, setResultsCount] = useState(0);
+  const [results, setResults] = useState<Record<string, EffScore>>({});
+  const [live, setLive] = useState<LiveItem[]>([]);
+  const [finalCount, setFinalCount] = useState(0);
+  const [liveCount, setLiveCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const firstLoad = useRef(true);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    if (firstLoad.current) setLoading(true);
     try {
       const res = await fetch("/api/tabla", { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Error cargando la tabla.");
       setStandings(data.standings ?? []);
       setResults(data.results ?? {});
-      setResultsCount(data.resultsCount ?? 0);
+      setLive(data.live ?? []);
+      setFinalCount(data.finalCount ?? 0);
+      setLiveCount(data.liveCount ?? 0);
+      setUpdatedAt(Date.now());
+      setError(null);
     } catch (e: any) {
       setError(e?.message ?? "Error cargando la tabla.");
     } finally {
       setLoading(false);
+      firstLoad.current = false;
     }
   }, []);
 
   useEffect(() => {
     load();
+    const id = setInterval(load, REFRESH_MS);
+    return () => clearInterval(id);
   }, [load]);
 
   const medal = (i: number) => (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`);
@@ -59,8 +83,11 @@ export default function TablaPage() {
         <div>
           <h1 className="text-2xl font-extrabold text-slate-800">Tabla de posiciones</h1>
           <p className="text-sm text-slate-500">
-            {resultsCount}/{MATCHES.length} partidos con resultado · {standings.length}{" "}
-            participante{standings.length === 1 ? "" : "s"}
+            {finalCount}/{MATCHES.length} con resultado
+            {liveCount > 0 && (
+              <span className="ml-1 font-semibold text-red-600">· 🔴 {liveCount} en vivo</span>
+            )}{" "}
+            · {standings.length} participante{standings.length === 1 ? "" : "s"}
           </p>
         </div>
         <button
@@ -75,6 +102,50 @@ export default function TablaPage() {
       {error && (
         <div className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}
+        </div>
+      )}
+
+      {/* Sección EN VIVO */}
+      {live.length > 0 && (
+        <div className="rounded-xl border border-red-200 bg-red-50/60 p-3">
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-red-700">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-600" />
+            </span>
+            EN VIVO
+          </div>
+          <div className="space-y-2">
+            {live.map((lv) => {
+              const m = matchById(lv.match_id);
+              if (!m) return null;
+              const h = team(m.home);
+              const a = team(m.away);
+              return (
+                <div
+                  key={lv.match_id}
+                  className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 shadow-sm"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Flag team={h} width={22} />
+                    <span className="truncate text-sm font-medium text-slate-700">{h.name}</span>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-center">
+                    <span className="text-lg font-extrabold tabular-nums text-slate-800">
+                      {lv.home} – {lv.away}
+                    </span>
+                    <span className="text-[10px] font-semibold uppercase text-red-600">
+                      {lv.detail || "En vivo"}
+                    </span>
+                  </div>
+                  <div className="flex min-w-0 items-center justify-end gap-2">
+                    <span className="truncate text-right text-sm font-medium text-slate-700">{a.name}</span>
+                    <Flag team={a} width={22} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -122,9 +193,11 @@ export default function TablaPage() {
       )}
 
       <p className="text-center text-xs text-slate-400">
-        Los puntos se actualizan a medida que el administrador carga los resultados.
-        Toca un participante para ver su detalle. Solo se muestran las predicciones de
-        partidos ya jugados.
+        {liveCount > 0
+          ? "Los puntos en vivo son provisionales y se confirman al terminar el partido. "
+          : ""}
+        La tabla se actualiza sola cada 45s
+        {updatedAt ? ` · últ. ${new Date(updatedAt).toLocaleTimeString("es")}` : ""}.
       </p>
     </div>
   );
@@ -143,7 +216,7 @@ function FragmentRow({
   highlight: boolean;
   open: boolean;
   onToggle: () => void;
-  results: Record<string, ResultRow>;
+  results: Record<string, EffScore>;
 }) {
   return (
     <>
@@ -156,7 +229,12 @@ function FragmentRow({
       >
         <td className="px-3 py-2.5 text-center text-base">{rank}</td>
         <td className="px-2 py-2.5">
-          <div className="font-semibold text-slate-800">{standing.participant}</div>
+          <div className="flex items-center gap-1.5 font-semibold text-slate-800">
+            {standing.participant}
+            {standing.liveScored > 0 && (
+              <span className="inline-block h-2 w-2 rounded-full bg-red-500" title="Tiene puntos en vivo" />
+            )}
+          </div>
           <div className="text-xs text-slate-400">
             {standing.scored} jugados · {standing.exact} exactos · {standing.outcomes} ganador
           </div>
@@ -182,7 +260,7 @@ function Detail({
   results,
 }: {
   detail: DetailRow[];
-  results: Record<string, ResultRow>;
+  results: Record<string, EffScore>;
 }) {
   if (!detail || detail.length === 0) {
     return (
@@ -191,7 +269,6 @@ function Detail({
       </p>
     );
   }
-  // ordenar por el orden del fixture
   const order = new Map(MATCHES.map((m, i) => [m.id, i]));
   const rows = [...detail].sort(
     (a, b) => (order.get(a.match_id) ?? 0) - (order.get(b.match_id) ?? 0)
@@ -217,8 +294,13 @@ function Detail({
               <Flag team={a} width={18} />
             </span>
             <span className="flex shrink-0 items-center gap-2">
+              {d.state === "live" && (
+                <span className="rounded bg-red-100 px-1 py-0.5 text-[10px] font-bold uppercase text-red-600">
+                  vivo
+                </span>
+              )}
               <span className="text-slate-400">
-                Tú {d.home}–{d.away} · Real {res.home}–{res.away}
+                Tú {d.home}–{d.away} · {res.home}–{res.away}
               </span>
               <span
                 className={

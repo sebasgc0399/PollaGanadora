@@ -131,6 +131,36 @@ su nombre y una **clave nueva**, y sus predicciones reaparecen (no se pierden).
 Cada partido editable muestra **"Cierra en 3h 20m"** (se cierra 1h antes del
 pitazo) y se actualiza solo.
 
+## 🔴 Resultados EN VIVO (automáticos)
+
+Los marcadores se traen solos de la **API pública de ESPN** (`fifa.world`):
+gratis, **sin API key ni registro**.
+
+- La **Tabla** se autorefresca cada 45s, muestra una sección **EN VIVO** con los
+  partidos en curso (marcador + minuto) y calcula **puntos provisionales** que se
+  confirman al terminar el partido.
+- Cuando un partido **termina**, su marcador final se **guarda solo** en la tabla
+  `results`. El **admin siempre puede corregir** un resultado a mano (lo manual
+  manda sobre ESPN).
+- Mapeo por par de equipos (los códigos de ESPN coinciden con los nuestros), así
+  que no depende de zonas horarias.
+
+### Sincronización garantizada (opcional)
+
+La Tabla ya persiste los finales cuando alguien la abre. Si quieres que los
+finales se guarden **aunque nadie esté mirando**, configura un cron gratuito que
+llame a `/api/sync` (idempotente):
+
+- **cron-job.org** (gratis, recomendado): crea un job cada 30 min a
+  `https://TU-APP.vercel.app/api/sync` con header `Authorization: Bearer <CRON_SECRET>`.
+- **Supabase pg_cron + pg_net** (gratis): `select cron.schedule(...)` con `net.http_post`.
+
+Define `CRON_SECRET` en Vercel para proteger el endpoint (si no lo defines,
+`/api/sync` queda abierto, pero solo guarda marcadores finales reales de ESPN).
+
+> Nota: ESPN es una API **no oficial**; si algún día cambia, la app sigue
+> funcionando con la carga manual del admin.
+
 ## ℹ️ Notas
 
 - Cada participante se identifica por **nombre + clave**. Si alguien usa un nombre
