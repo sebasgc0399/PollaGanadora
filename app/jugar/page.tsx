@@ -408,7 +408,7 @@ export default function JugarPage() {
 
   return (
     <>
-      <div className="mx-auto max-w-6xl pb-28 lg:grid lg:grid-cols-[290px_1fr] lg:gap-6 lg:items-start">
+      <div className="mx-auto max-w-6xl pb-8 lg:grid lg:grid-cols-[290px_1fr] lg:gap-6 lg:items-start">
         {/* ---------- Barra lateral ---------- */}
         <aside className="space-y-3 lg:sticky lg:top-[73px] lg:self-start">
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -447,6 +447,17 @@ export default function JugarPage() {
                 {filledCount}/{MATCHES.length} llenos
                 {editableLeft > 0 ? ` · faltan ${editableLeft}` : " · ¡todo listo!"}
               </p>
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-2">
+              <SaveStatus state={saveState} unsaved={hasUnsaved} />
+              {saveState === "error" && (
+                <button
+                  onClick={() => doSave(false)}
+                  className="rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-red-700"
+                >
+                  Reintentar
+                </button>
+              )}
             </div>
           </div>
 
@@ -573,26 +584,12 @@ export default function JugarPage() {
       {showTop && (
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          className="fixed bottom-20 right-4 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/90 text-white shadow-lg transition hover:bg-slate-900"
+          className="fixed bottom-4 right-4 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/90 text-white shadow-lg transition hover:bg-slate-900"
           aria-label="Volver arriba"
         >
           ↑
         </button>
       )}
-
-      {/* Barra inferior: estado de guardado */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-          <SaveStatus state={saveState} unsaved={hasUnsaved} />
-          <button
-            onClick={() => doSave(false)}
-            disabled={saveState === "saving"}
-            className="rounded-xl bg-pitch-700 px-5 py-2.5 font-semibold text-white shadow transition hover:bg-pitch-800 disabled:opacity-60"
-          >
-            {saveState === "saving" ? "Guardando…" : "Guardar"}
-          </button>
-        </div>
-      </div>
     </>
   );
 }
