@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { MATCHES, GROUPS, lockTimeMs, formatRemaining } from "@/lib/matches";
+import { MATCHES, GROUPS, lockTimeMs, formatRemaining, formatMatchDate, Match } from "@/lib/matches";
 import MatchScoreRow from "@/components/MatchScoreRow";
 import { pointsFor, hitLabel } from "@/lib/scoring";
 
@@ -20,17 +20,29 @@ export default function JugarPage() {
   const [msg, setMsg] = useState<Msg | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [resetOpen, setResetOpen] = useState(false);
+  const [view, setView] = useState<"grupos" | "fecha">("fecha");
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem("pg_name");
       if (saved) setName(saved);
+      const v = localStorage.getItem("pg_view");
+      if (v === "grupos" || v === "fecha") setView(v);
     } catch {
       /* ignore */
     }
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
+
+  function changeView(v: "grupos" | "fecha") {
+    setView(v);
+    try {
+      localStorage.setItem("pg_view", v);
+    } catch {
+      /* ignore */
+    }
+  }
 
   async function login() {
     if (!name.trim()) return setMsg({ type: "err", text: "Escribe tu nombre." });
@@ -117,6 +129,45 @@ export default function JugarPage() {
     () => MATCHES.filter((m) => !(results[m.id] || now >= lockTimeMs(m))).length,
     [results, now]
   );
+
+  // Partidos agrupados por día (orden cronológico), para la vista "Por fecha".
+  const byDate = useMemo(() => {
+    const map = new Map<string, Match[]>();
+    for (const m of MATCHES) {
+      if (!map.has(m.date)) map.set(m.date, []);
+      map.get(m.date)!.push(m);
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime());
+    }
+    return Array.from(map.entries()); // ya en orden de fecha (MATCHES viene ordenado)
+  }, []);
+
+  function renderMatch(m: Match) {
+    const p = preds[m.id] ?? { home: "", away: "" };
+    const result = results[m.id];
+    const locked = !!result || now >= lockTimeMs(m);
+    return (
+      <MatchScoreRow
+        key={m.id}
+        match={m}
+        home={p.home}
+        away={p.away}
+        disabled={locked}
+        closesIn={!locked ? formatRemaining(lockTimeMs(m) - now) : undefined}
+        onChange={(h, a) => setPred(m.id, h, a)}
+        footer={
+          result ? (
+            <ResultFooter result={result} pred={p} />
+          ) : locked ? (
+            <div className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">
+              🔒 Cerrado · el partido está por empezar
+            </div>
+          ) : null
+        }
+      />
+    );
+  }
 
   async function save() {
     setSaving(true);
@@ -265,40 +316,44 @@ export default function JugarPage() {
 
       {msg && <Banner msg={msg} />}
 
-      {GROUPS.map((g) => (
-        <section key={g}>
-          <h2 className="sticky top-[57px] z-10 -mx-4 bg-emerald-50/95 px-4 py-1.5 text-sm font-bold uppercase tracking-wide text-pitch-800 backdrop-blur">
-            Grupo {g}
-          </h2>
-          <div className="mt-2 space-y-2">
-            {MATCHES.filter((m) => m.group === g).map((m) => {
-              const p = preds[m.id] ?? { home: "", away: "" };
-              const result = results[m.id];
-              const locked = !!result || now >= lockTimeMs(m);
-              return (
-                <MatchScoreRow
-                  key={m.id}
-                  match={m}
-                  home={p.home}
-                  away={p.away}
-                  disabled={locked}
-                  closesIn={!locked ? formatRemaining(lockTimeMs(m) - now) : undefined}
-                  onChange={(h, a) => setPred(m.id, h, a)}
-                  footer={
-                    result ? (
-                      <ResultFooter result={result} pred={p} />
-                    ) : locked ? (
-                      <div className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">
-                        🔒 Cerrado · el partido está por empezar
-                      </div>
-                    ) : null
-                  }
-                />
-              );
-            })}
-          </div>
-        </section>
-      ))}
+      {/* Selector de vista: por grupos o por fecha */}
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-slate-500">Organizar:</span>
+        <div className="inline-flex rounded-full border border-slate-300 bg-white p-0.5">
+          {(["fecha", "grupos"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => changeView(v)}
+              className={
+                "rounded-full px-3 py-1 font-medium transition " +
+                (view === v ? "bg-pitch-700 text-white" : "text-slate-600 hover:bg-slate-100")
+              }
+            >
+              {v === "grupos" ? "Por grupos" : "Por fecha"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {view === "grupos"
+        ? GROUPS.map((g) => (
+            <section key={g}>
+              <h2 className="sticky top-[57px] z-10 -mx-4 bg-emerald-50/95 px-4 py-1.5 text-sm font-bold uppercase tracking-wide text-pitch-800 backdrop-blur">
+                Grupo {g}
+              </h2>
+              <div className="mt-2 space-y-2">
+                {MATCHES.filter((m) => m.group === g).map((m) => renderMatch(m))}
+              </div>
+            </section>
+          ))
+        : byDate.map(([date, matches]) => (
+            <section key={date}>
+              <h2 className="sticky top-[57px] z-10 -mx-4 bg-emerald-50/95 px-4 py-1.5 text-sm font-bold capitalize tracking-wide text-pitch-800 backdrop-blur">
+                {formatMatchDate(date)}
+              </h2>
+              <div className="mt-2 space-y-2">{matches.map((m) => renderMatch(m))}</div>
+            </section>
+          ))}
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
