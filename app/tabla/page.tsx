@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { MATCHES, matchById, team } from "@/lib/matches";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MATCHES, matchById, team, formatMatchDate, formatKickoffTime } from "@/lib/matches";
 import Flag from "@/components/Flag";
 
 interface EffScore {
@@ -116,8 +116,8 @@ export default function TablaPage() {
         </div>
       )}
 
-      {/* Sección EN VIVO */}
-      {live.length > 0 && (
+      {/* En vivo, o cuenta regresiva al próximo partido */}
+      {live.length > 0 ? (
         <div className="rounded-xl border border-red-200 bg-red-50/60 p-3">
           <div className="mb-2 flex items-center gap-2 text-sm font-bold text-red-700">
             <span className="relative flex h-2.5 w-2.5">
@@ -158,6 +158,8 @@ export default function TablaPage() {
             })}
           </div>
         </div>
+      ) : (
+        <NextMatchCard />
       )}
 
       {!error && !loading && standings.length === 0 && (
@@ -341,6 +343,70 @@ function Detail({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function fmtCountdown(ms: number): string {
+  if (ms <= 0) return "¡ya!";
+  const total = Math.floor(ms / 1000);
+  const d = Math.floor(total / 86400);
+  const h = Math.floor((total % 86400) / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (d > 0 ? `${d}d ` : "") + `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+// Cuando NO hay partidos en vivo: muestra el próximo partido (quién juega) con
+// una cuenta regresiva en tiempo real hasta el pitazo. Ocupa el mismo lugar y
+// tamaño que la tarjeta EN VIVO. Tiene su propio tick para no re-renderizar la
+// tabla entera cada segundo.
+function NextMatchCard() {
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const next = useMemo(() => {
+    if (!now) return null;
+    return (
+      MATCHES.filter((m) => new Date(m.kickoff).getTime() > now).sort(
+        (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
+      )[0] ?? null
+    );
+  }, [now]);
+
+  if (!now || !next) return null;
+  const ms = new Date(next.kickoff).getTime() - now;
+  const h = team(next.home);
+  const a = team(next.away);
+
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+      <div className="mb-2 flex items-center gap-2 text-sm font-bold text-pitch-700">
+        ⏱ PRÓXIMO PARTIDO
+      </div>
+      <div className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 shadow-sm">
+        <div className="flex min-w-0 items-center gap-2">
+          <Flag team={h} width={22} />
+          <span className="truncate text-sm font-medium text-slate-700">{h.name}</span>
+        </div>
+        <div className="flex shrink-0 flex-col items-center px-1">
+          <span className="text-lg font-extrabold tabular-nums text-pitch-700">
+            {fmtCountdown(ms)}
+          </span>
+          <span className="text-[10px] font-semibold uppercase text-slate-400">
+            {formatMatchDate(next.date)} · {formatKickoffTime(next.kickoff)}
+          </span>
+        </div>
+        <div className="flex min-w-0 items-center justify-end gap-2">
+          <span className="truncate text-right text-sm font-medium text-slate-700">{a.name}</span>
+          <Flag team={a} width={22} />
+        </div>
+      </div>
     </div>
   );
 }
