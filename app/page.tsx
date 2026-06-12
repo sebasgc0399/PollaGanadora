@@ -76,23 +76,17 @@ export default function HomePage() {
 
       <section>
         <h2 className="mb-3 text-xl font-bold text-slate-800">¿Cómo se puntúa?</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
           <RuleCard
             points="3"
             title="Marcador exacto"
-            desc="Aciertas el resultado tal cual. Ej.: predices 2-1 y queda 2-1."
-            accent="bg-pitch-700"
-          />
-          <RuleCard
-            points="3"
-            title="Empate acertado"
-            desc="Predices empate y el partido termina empatado, aunque el marcador exacto no coincida."
+            desc="Aciertas el marcador tal cual, también en empates. Ej.: predices 2-1 y queda 2-1, o 1-1 y queda 1-1."
             accent="bg-pitch-700"
           />
           <RuleCard
             points="1"
-            title="Acertaste el ganador"
-            desc="El equipo ganador es el correcto, pero el marcador exacto no coincide."
+            title="Acertaste el resultado"
+            desc="El ganador es el correcto, o es empate, pero el marcador no es exacto. Ej.: predices 2-0 y queda 3-1, o empatas 1-1 y queda 0-0."
             accent="bg-emerald-500"
           />
           <RuleCard

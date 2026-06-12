@@ -11,9 +11,8 @@ de posiciones se calcula sola.
 
 | Acierto | Puntos |
 | --- | --- |
-| **Marcador exacto** (predices 2-1 y queda 2-1) | **3** |
-| **Empate acertado** (predices empate y empatan, aunque el marcador no coincida) | **3** |
-| **Acertaste el ganador** pero no el marcador exacto | **1** |
+| **Marcador exacto** (incluye empates exactos: 1-1 y queda 1-1) | **3** |
+| **Acertaste el resultado** (ganador correcto, o empate pero con otro marcador) | **1** |
 | Fallaste el resultado | **0** |
 
 Lógica en [`lib/scoring.ts`](lib/scoring.ts).

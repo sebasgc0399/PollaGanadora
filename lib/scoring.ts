@@ -1,11 +1,10 @@
 // ---------------------------------------------------------------------------
 // Reglas de puntaje de la Polla Ganadora
 //
-//  • Marcador EXACTO  ............................. 3 puntos
-//  • Empate acertado (predijiste empate y fue empate, aunque el marcador
-//    exacto no coincida) ........................... 3 puntos
-//  • Acertaste el ganador (equipo correcto) pero no el marcador exacto . 1 punto
-//  • No acertaste el resultado .................... 0 puntos
+//  • Marcador EXACTO (incluye empates con el marcador exacto) ..... 3 puntos
+//  • Acertaste el resultado (ganador correcto, o empate pero con
+//    otro marcador) ............................................... 1 punto
+//  • No acertaste el resultado .................................... 0 puntos
 // ---------------------------------------------------------------------------
 
 export interface Score {
@@ -15,7 +14,6 @@ export interface Score {
 
 export const POINTS = {
   EXACT: 3,
-  DRAW: 3,
   OUTCOME: 1,
   MISS: 0,
 } as const;
@@ -35,17 +33,14 @@ export function pointsFor(prediction?: Score | null, result?: Score | null): num
   if (!prediction || !result) return 0;
   if (!isValidScore(prediction) || !isValidScore(result)) return 0;
 
-  // Marcador exacto → 3
+  // Marcador exacto (incluye empates exactos) → 3
   if (prediction.home === result.home && prediction.away === result.away) {
     return POINTS.EXACT;
   }
 
-  const po = outcome(prediction);
-  const ro = outcome(result);
-
-  if (po === ro) {
-    // Empate acertado (no exacto) → 3 ; ganador acertado → 1
-    return po === 0 ? POINTS.DRAW : POINTS.OUTCOME;
+  // Acertaste el resultado: ganador correcto, o empate pero con otro marcador → 1
+  if (outcome(prediction) === outcome(result)) {
+    return POINTS.OUTCOME;
   }
 
   return POINTS.MISS;
