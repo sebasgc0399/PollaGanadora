@@ -27,8 +27,8 @@ Diseñado para que **nadie haga trampa**:
 - **Clave personal por participante** (guardada con hash `scrypt`, nunca en texto
   plano). Solo tú, con tu clave, puedes ver o editar tus marcadores.
 - **Bloqueo por tiempo validado en el servidor**: la edición de un partido se
-  cierra **1 hora antes del pitazo**. No se puede saltar cambiando el reloj del
-  navegador ni llamando a la API directo.
+  cierra **10 minutos antes del pitazo**. No se puede saltar cambiando el reloj
+  del navegador ni llamando a la API directo.
 - **Fallback del admin**: si el administrador ya cargó el resultado de un partido,
   ese partido queda bloqueado igual (aunque el horario estuviera mal).
 - **La tabla solo revela predicciones de partidos ya jugados** — no se pueden
@@ -103,7 +103,7 @@ Abre <http://localhost:3000>.
 
 Los 72 partidos y sus horarios están en [`lib/matches.ts`](lib/matches.ts). El
 campo `kickoff` es el pitazo inicial en **hora del Este (ET, UTC-04:00 en junio)**;
-de ahí se calcula el bloqueo de 1h antes. Los horarios se cotejaron entre ESPN y
+de ahí se calcula el bloqueo de 10 min antes. Los horarios se cotejaron entre ESPN y
 worldcupwiki (best-effort): **verifícalos** y edita si la FIFA cambia algo. **No
 cambies los `id` (`m01`…`m72`)** de partidos que ya tengan datos guardados.
 
@@ -127,7 +127,7 @@ su nombre y una **clave nueva**, y sus predicciones reaparecen (no se pierden).
 
 ## ⏱️ Cuenta regresiva
 
-Cada partido editable muestra **"Cierra en 3h 20m"** (se cierra 1h antes del
+Cada partido editable muestra **"Cierra en 3h 20m"** (se cierra 10 min antes del
 pitazo) y se actualiza solo.
 
 ## 🔴 Resultados EN VIVO (automáticos)

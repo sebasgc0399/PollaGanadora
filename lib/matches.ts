@@ -186,7 +186,7 @@ export function formatMatchDate(iso: string): string {
 // ---------------------------------------------------------------------------
 
 /** Minutos antes del pitazo en que se cierra la edición de la predicción. */
-export const LOCK_MINUTES_BEFORE = 60;
+export const LOCK_MINUTES_BEFORE = 10;
 
 /** Instante (ms epoch) a partir del cual el partido queda cerrado por tiempo. */
 export function lockTimeMs(m: Match): number {
