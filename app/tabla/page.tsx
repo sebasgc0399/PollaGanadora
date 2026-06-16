@@ -282,67 +282,74 @@ function Detail({
       </p>
     );
   }
-  const order = new Map(MATCHES.map((m, i) => [m.id, i]));
-  const rows = [...detail].sort(
-    (a, b) => (order.get(a.match_id) ?? 0) - (order.get(b.match_id) ?? 0)
-  );
+  // Más reciente primero (por hora de inicio del partido).
+  const rows = [...detail].sort((a, b) => {
+    const ka = matchById(a.match_id)?.kickoff ?? "";
+    const kb = matchById(b.match_id)?.kickoff ?? "";
+    return new Date(kb).getTime() - new Date(ka).getTime();
+  });
   return (
     <div className="space-y-1">
-      {/* Leyenda (una sola vez): aclara el orden pronóstico → resultado */}
-      <div className="flex items-center justify-end gap-1 pr-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
-        tu pronóstico <span className="text-slate-300">→</span> resultado
+      <div className="flex flex-wrap items-center justify-between gap-x-2 px-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+        <span>{rows.length} jugados · reciente primero</span>
+        <span>
+          tu pronóstico <span className="text-slate-300">→</span> resultado
+        </span>
       </div>
-      {rows.map((d) => {
-        const m = matchById(d.match_id);
-        const res = results[d.match_id];
-        if (!m || !res) return null;
-        const h = team(m.home);
-        const a = team(m.away);
-        const live = d.state === "live";
-        return (
-          <div
-            key={d.match_id}
-            className="flex items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-1.5 text-xs"
-          >
-            <span className="flex min-w-0 items-center gap-1.5 truncate text-slate-600">
-              <Flag team={h} width={16} />
-              <span className="truncate">
-                {h.name} <span className="text-slate-300">vs</span> {a.name}
+      {/* Área con scroll para que la lista no empuje la tabla */}
+      <div className="max-h-80 space-y-1 overflow-y-auto pr-0.5">
+        {rows.map((d) => {
+          const m = matchById(d.match_id);
+          const res = results[d.match_id];
+          if (!m || !res) return null;
+          const h = team(m.home);
+          const a = team(m.away);
+          const live = d.state === "live";
+          return (
+            <div
+              key={d.match_id}
+              className="flex flex-col gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs sm:flex-row sm:items-center sm:justify-between sm:gap-2"
+            >
+              <span className="flex min-w-0 items-center gap-1.5 text-slate-600">
+                <Flag team={h} width={16} />
+                <span className="truncate">
+                  {h.name} <span className="text-slate-300">vs</span> {a.name}
+                </span>
+                <Flag team={a} width={16} />
               </span>
-              <Flag team={a} width={16} />
-            </span>
-            <span className="flex shrink-0 items-center gap-1">
-              {/* Pronóstico: apagado (lo que dijiste) */}
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold tabular-nums text-slate-500">
-                {d.home}-{d.away}
+              <span className="flex shrink-0 items-center gap-1 self-end sm:self-auto">
+                {/* Pronóstico: apagado (lo que dijiste) */}
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold tabular-nums text-slate-500">
+                  {d.home}-{d.away}
+                </span>
+                <span className="px-0.5 text-slate-300">→</span>
+                {/* Resultado: resaltado (lo que pasó); rojo si va en vivo */}
+                <span
+                  className={
+                    "flex items-center gap-1 rounded px-1.5 py-0.5 font-bold tabular-nums text-white " +
+                    (live ? "bg-red-600" : "bg-slate-700")
+                  }
+                >
+                  {live && <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/90" />}
+                  {res.home}-{res.away}
+                </span>
+                <span
+                  className={
+                    "ml-0.5 min-w-[30px] rounded px-1.5 py-0.5 text-center font-bold " +
+                    (d.pts >= 3
+                      ? "bg-pitch-700 text-white"
+                      : d.pts === 1
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-slate-200 text-slate-500")
+                  }
+                >
+                  +{d.pts}
+                </span>
               </span>
-              <span className="px-0.5 text-slate-300">→</span>
-              {/* Resultado: resaltado (lo que pasó); rojo si va en vivo */}
-              <span
-                className={
-                  "flex items-center gap-1 rounded px-1.5 py-0.5 font-bold tabular-nums text-white " +
-                  (live ? "bg-red-600" : "bg-slate-700")
-                }
-              >
-                {live && <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/90" />}
-                {res.home}-{res.away}
-              </span>
-              <span
-                className={
-                  "ml-0.5 min-w-[30px] rounded px-1.5 py-0.5 text-center font-bold " +
-                  (d.pts >= 3
-                    ? "bg-pitch-700 text-white"
-                    : d.pts === 1
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-slate-200 text-slate-500")
-                }
-              >
-                +{d.pts}
-              </span>
-            </span>
-          </div>
-        );
-      })}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
