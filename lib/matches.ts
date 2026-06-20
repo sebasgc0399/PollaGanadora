@@ -115,7 +115,7 @@ export const MATCHES: Match[] = [
   { id: "m28", group: "A", matchday: 2, date: "2026-06-18", kickoff: "2026-06-18T21:00:00-04:00", home: "MEX", away: "KOR" },
   { id: "m29", group: "C", matchday: 2, date: "2026-06-19", kickoff: "2026-06-19T18:00:00-04:00", home: "SCO", away: "MAR" },
   { id: "m30", group: "D", matchday: 2, date: "2026-06-19", kickoff: "2026-06-19T15:00:00-04:00", home: "USA", away: "AUS" },
-  { id: "m31", group: "C", matchday: 2, date: "2026-06-19", kickoff: "2026-06-19T21:00:00-04:00", home: "BRA", away: "HAI" },
+  { id: "m31", group: "C", matchday: 2, date: "2026-06-19", kickoff: "2026-06-19T20:30:00-04:00", home: "BRA", away: "HAI" },
   { id: "m32", group: "D", matchday: 2, date: "2026-06-19", kickoff: "2026-06-20T00:00:00-04:00", home: "TUR", away: "PAR" },
   { id: "m33", group: "F", matchday: 2, date: "2026-06-20", kickoff: "2026-06-20T13:00:00-04:00", home: "NED", away: "SWE" },
   { id: "m34", group: "E", matchday: 2, date: "2026-06-20", kickoff: "2026-06-20T16:00:00-04:00", home: "GER", away: "CIV" },
