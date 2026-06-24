@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminClient, isServerConfigured } from "@/lib/supabaseAdmin";
 import { pointsFor, hitLabel } from "@/lib/scoring";
 import { fetchLiveScores } from "@/lib/espn";
@@ -7,6 +8,32 @@ import type { PredictionRow, ResultRow } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Supabase/PostgREST corta cada consulta en `max-rows` (1000 por defecto), así
+// que NO basta con `.range(0, 99999)`: hay que paginar. Con N participantes ×
+// hasta 72 partidos se superan las 1000 filas y, sin esto, se perderían las
+// últimas predicciones guardadas (justo las jornadas más recientes), haciendo
+// que algunos pronósticos no aparezcan en la tabla aunque sí estén en la base.
+const PAGE = 1000;
+
+async function fetchAllPredictions(sb: SupabaseClient): Promise<PredictionRow[]> {
+  const all: PredictionRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    // Orden estable por la llave primaria para que la paginación no salte ni
+    // repita filas entre bloques.
+    const { data, error } = await sb
+      .from("predictions")
+      .select("participant,match_id,home,away")
+      .order("participant", { ascending: true })
+      .order("match_id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as PredictionRow[];
+    all.push(...batch);
+    if (batch.length < PAGE) break; // último bloque
+  }
+  return all;
+}
 
 interface DetailRow {
   match_id: string;
@@ -23,12 +50,17 @@ export async function GET() {
   }
 
   const sb = getAdminClient();
-  const [predRes, resRes, live] = await Promise.all([
-    sb.from("predictions").select("participant,match_id,home,away"),
-    sb.from("results").select("match_id,home,away"),
-    fetchLiveScores(),
-  ]);
-  if (predRes.error) return NextResponse.json({ error: predRes.error.message }, { status: 500 });
+  let allPreds: PredictionRow[];
+  let resRes, live;
+  try {
+    [allPreds, resRes, live] = await Promise.all([
+      fetchAllPredictions(sb),
+      sb.from("results").select("match_id,home,away"),
+      fetchLiveScores(),
+    ]);
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message ?? "Error cargando predicciones." }, { status: 500 });
+  }
   if (resRes.error) return NextResponse.json({ error: resRes.error.message }, { status: 500 });
 
   const dbResults: Record<string, ResultRow> = {};
@@ -62,7 +94,7 @@ export async function GET() {
 
   // Agrupar predicciones por participante
   const byParticipant = new Map<string, PredictionRow[]>();
-  for (const p of (predRes.data ?? []) as PredictionRow[]) {
+  for (const p of allPreds) {
     if (!byParticipant.has(p.participant)) byParticipant.set(p.participant, []);
     byParticipant.get(p.participant)!.push(p);
   }
