@@ -47,12 +47,17 @@ export default function TablaPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const firstLoad = useRef(true);
+  const reqSeq = useRef(0);
 
   const load = useCallback(async () => {
     if (firstLoad.current) setLoading(true);
+    const mine = ++reqSeq.current;
     try {
       const res = await fetch("/api/tabla", { cache: "no-store" });
       const data = await res.json();
+      // Descartar respuestas que llegan fuera de orden: si ya se disparó una
+      // petición más nueva, esta quedó obsoleta y no debe pisar el estado.
+      if (mine !== reqSeq.current) return;
       if (!res.ok) throw new Error(data?.error ?? "Error cargando la tabla.");
       setStandings(data.standings ?? []);
       setResults(data.results ?? {});

@@ -49,6 +49,8 @@ export default function JugarPage() {
   const [showTop, setShowTop] = useState(false);
 
   const snapshot = useRef<Record<string, string>>({}); // últimas predicciones guardadas "h-a"
+  const boardSeq = useRef(0); // descarta respuestas de /api/tabla fuera de orden
+  const lockWarned = useRef<Set<string>>(new Set()); // partidos ya avisados como "no guardado a tiempo"
   const today = todayStr();
 
   useEffect(() => {
@@ -71,9 +73,11 @@ export default function JugarPage() {
 
   // ---------- carga de marcadores/puntos (en vivo) ----------
   const fetchBoard = useCallback(async (who: string) => {
+    const mine = ++boardSeq.current;
     try {
       const res = await fetch("/api/tabla", { cache: "no-store" });
       const data = await res.json();
+      if (mine !== boardSeq.current) return; // respuesta vieja: llegó otra más nueva
       if (!res.ok) return;
       const sc: Record<string, Score> = {};
       Object.entries(data.results ?? {}).forEach(([id, v]: any) => (sc[id] = v));
@@ -262,6 +266,30 @@ export default function JugarPage() {
     window.addEventListener("beforeunload", h);
     return () => window.removeEventListener("beforeunload", h);
   }, [hasUnsaved]);
+
+  // Aviso si un pronóstico escrito (completo y distinto al ya guardado) no
+  // alcanzó a guardarse antes de que el partido cerrara. El auto-guardado lo
+  // omite en silencio, así que aquí lo señalamos una sola vez por partido.
+  useEffect(() => {
+    if (stage !== "form") return;
+    const lost: string[] = [];
+    for (const m of MATCHES) {
+      if (scores[m.id]?.state === "final") continue;
+      if (now < lockTimeMs(m)) continue; // todavía editable
+      if (lockWarned.current.has(m.id)) continue;
+      const p = preds[m.id];
+      if (!p || p.home === "" || p.away === "") continue; // no había pronóstico completo
+      if (snapshot.current[m.id] === `${p.home}-${p.away}`) continue; // ya estaba guardado
+      lockWarned.current.add(m.id);
+      lost.push(`${team(m.home).name} vs ${team(m.away).name}`);
+    }
+    if (lost.length > 0) {
+      setMsg({
+        type: "err",
+        text: `Se cerró ${lost.length === 1 ? "el partido" : "los partidos"} y no se alcanzó a guardar tu pronóstico de: ${lost.join(", ")}.`,
+      });
+    }
+  }, [now, stage, preds, scores]);
 
   // ---------- derivados ----------
   const filledCount = useMemo(
