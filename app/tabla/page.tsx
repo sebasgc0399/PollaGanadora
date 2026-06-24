@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MATCHES, matchById, team, formatMatchDate, formatKickoffTime } from "@/lib/matches";
 import Flag from "@/components/Flag";
+import { buildReportMessage, shareReport, type ReportPending } from "@/lib/report";
 
 interface EffScore {
   home: number;
@@ -46,6 +47,7 @@ export default function TablaPage() {
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [pend, setPend] = useState<ReportPending | null>(null);
   const firstLoad = useRef(true);
   const reqSeq = useRef(0);
 
@@ -53,8 +55,12 @@ export default function TablaPage() {
     if (firstLoad.current) setLoading(true);
     const mine = ++reqSeq.current;
     try {
-      const res = await fetch("/api/tabla", { cache: "no-store" });
+      const [res, pendRes] = await Promise.all([
+        fetch("/api/tabla", { cache: "no-store" }),
+        fetch("/api/pendientes", { cache: "no-store" }),
+      ]);
       const data = await res.json();
+      const pendData = await pendRes.json().catch(() => null);
       // Descartar respuestas que llegan fuera de orden: si ya se disparó una
       // petición más nueva, esta quedó obsoleta y no debe pisar el estado.
       if (mine !== reqSeq.current) return;
@@ -64,6 +70,7 @@ export default function TablaPage() {
       setLive(data.live ?? []);
       setFinalCount(data.finalCount ?? 0);
       setLiveCount(data.liveCount ?? 0);
+      setPend(pendRes.ok ? (pendData as ReportPending) : null);
       setUpdatedAt(Date.now());
       setError(null);
     } catch (e: any) {
@@ -106,13 +113,23 @@ export default function TablaPage() {
             · {standings.length} participante{standings.length === 1 ? "" : "s"}
           </p>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-60"
-        >
-          {loading ? "…" : "↻ Actualizar"}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={() => shareReport(buildReportMessage(standings, pend))}
+            disabled={loading || standings.length === 0}
+            title="Comparte quién falta por pronosticar hoy y la tabla"
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-3.5 py-1.5 text-sm font-bold text-white shadow-sm transition hover:brightness-95 disabled:opacity-50"
+          >
+            📲 Compartir
+          </button>
+          <button
+            onClick={load}
+            disabled={loading}
+            className="rounded-full border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-60"
+          >
+            {loading ? "…" : "↻"}
+          </button>
+        </div>
       </div>
 
       {error && (

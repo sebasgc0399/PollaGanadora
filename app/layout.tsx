@@ -42,6 +42,7 @@ export default function RootLayout({
             <div className="flex items-center gap-1">
               <NavLink href="/jugar">Jugar</NavLink>
               <NavLink href="/tabla">Tabla</NavLink>
+              <NavLink href="/reporte">Reporte</NavLink>
               <NavLink href="/admin">Admin</NavLink>
             </div>
           </nav>
