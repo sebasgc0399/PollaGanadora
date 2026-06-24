@@ -74,7 +74,8 @@ export async function GET() {
   );
   if (toPersist.length > 0) {
     const { error } = await sb.from("results").upsert(toPersist, { onConflict: "match_id" });
-    if (!error) toPersist.forEach((r) => (dbResults[r.match_id] = r));
+    if (error) console.error("tabla: no se pudieron persistir resultados finales:", error.message);
+    else toPersist.forEach((r) => (dbResults[r.match_id] = r));
   }
 
   // Marcador EFECTIVO por partido: la base (admin/auto) manda; si no, lo EN VIVO.
