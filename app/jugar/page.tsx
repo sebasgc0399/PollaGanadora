@@ -82,7 +82,11 @@ export default function JugarPage() {
       (data.live ?? []).forEach((l: any) => (ld[l.match_id] = l.detail));
       setLiveDetail(ld);
       const list = data.standings ?? [];
-      const idx = list.findIndex((s: any) => s.participant === who);
+      // El servidor guarda el nombre normalizado (trim + espacios colapsados);
+      // normalizamos igual aquí para no fallar el match y mostrar "0 pts" a un
+      // participante que sí está en la tabla.
+      const target = who.trim().replace(/\s+/g, " ");
+      const idx = list.findIndex((s: any) => s.participant === target);
       setMe(
         idx >= 0
           ? { points: list[idx].points, rank: idx + 1, total: list.length }
