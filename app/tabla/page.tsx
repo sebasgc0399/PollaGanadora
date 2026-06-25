@@ -98,28 +98,35 @@ export default function TablaPage() {
     };
   }, [load]);
 
-  const medal = (i: number) => (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`);
-
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold text-slate-800">Tabla de posiciones</h1>
-          <p className="text-sm text-slate-500">
-            {finalCount}/{MATCHES.length} con resultado
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1.5">
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-800">
+            Tabla de posiciones
+          </h1>
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
+              {finalCount}/{MATCHES.length} con resultado
+            </span>
             {liveCount > 0 && (
-              <span className="ml-1 font-semibold text-red-600">· 🔴 {liveCount} en vivo</span>
-            )}{" "}
-            · {standings.length} participante{standings.length === 1 ? "" : "s"}
-          </p>
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-600">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-600" />
+                {liveCount} en vivo
+              </span>
+            )}
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
+              {standings.length} participante{standings.length === 1 ? "" : "s"}
+            </span>
+          </div>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           {live.length > 0 && (
             <button
               onClick={() => shareReport(buildLiveMessage(standings, live))}
               disabled={loading}
               title="Comparte el pronóstico de cada uno en los partidos en juego ahora"
-              className="inline-flex items-center gap-1.5 rounded-full bg-red-600 px-3.5 py-1.5 text-sm font-bold text-white shadow-sm transition hover:brightness-95 disabled:opacity-50"
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-red-600 px-3.5 py-2 text-sm font-bold text-white shadow-sm transition hover:brightness-95 disabled:opacity-50 sm:flex-none"
             >
               🔴 En juego
             </button>
@@ -128,14 +135,15 @@ export default function TablaPage() {
             onClick={() => shareReport(buildReportMessage(standings, pend))}
             disabled={loading || standings.length === 0}
             title="Comparte quién falta por pronosticar hoy y la tabla"
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-3.5 py-1.5 text-sm font-bold text-white shadow-sm transition hover:brightness-95 disabled:opacity-50"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-[#25D366] px-3.5 py-2 text-sm font-bold text-white shadow-sm transition hover:brightness-95 disabled:opacity-50 sm:flex-none"
           >
             📲 Compartir
           </button>
           <button
             onClick={load}
             disabled={loading}
-            className="rounded-full border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-60"
+            aria-label="Actualizar"
+            className="shrink-0 rounded-full border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-60"
           >
             {loading ? "…" : "↻"}
           </button>
@@ -205,16 +213,16 @@ export default function TablaPage() {
       )}
 
       {standings.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-slate-500">
-                <th className="px-3 py-2 text-left font-semibold">#</th>
-                <th className="px-2 py-2 text-left font-semibold">Participante</th>
-                <th className="px-2 py-2 text-center font-semibold" title="Marcadores exactos">
+              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
+                <th className="py-2.5 pl-3 pr-1 text-center font-semibold">#</th>
+                <th className="px-2 py-2.5 text-left font-semibold">Participante</th>
+                <th className="px-1 py-2.5 text-center font-semibold" title="Marcadores exactos">
                   🎯
                 </th>
-                <th className="px-3 py-2 text-right font-semibold">Pts</th>
+                <th className="py-2.5 pl-1 pr-3 text-right font-semibold">Pts</th>
               </tr>
             </thead>
             <tbody>
@@ -224,8 +232,7 @@ export default function TablaPage() {
                   <FragmentRow
                     key={s.participant}
                     standing={s}
-                    rank={medal(i)}
-                    highlight={i < 3}
+                    index={i}
                     open={open}
                     onToggle={() => setExpanded(open ? null : s.participant)}
                     results={results}
@@ -248,49 +255,90 @@ export default function TablaPage() {
   );
 }
 
+const PODIUM = ["🥇", "🥈", "🥉"];
+
+function RankBadge({ index }: { index: number }) {
+  if (index < 3) {
+    return <span className="text-xl leading-none">{PODIUM[index]}</span>;
+  }
+  return (
+    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500">
+      {index + 1}
+    </span>
+  );
+}
+
 function FragmentRow({
   standing,
-  rank,
-  highlight,
+  index,
   open,
   onToggle,
   results,
 }: {
   standing: Standing;
-  rank: string;
-  highlight: boolean;
+  index: number;
   open: boolean;
   onToggle: () => void;
   results: Record<string, EffScore>;
 }) {
+  const podium = index < 3;
+  const accent =
+    index === 0
+      ? "border-l-amber-400 bg-amber-50/40"
+      : index === 1
+      ? "border-l-slate-300 bg-slate-50/60"
+      : index === 2
+      ? "border-l-orange-300 bg-orange-50/30"
+      : "border-l-transparent";
   return (
     <>
       <tr
         onClick={onToggle}
+        aria-expanded={open}
         className={
-          "cursor-pointer border-b border-slate-100 transition hover:bg-emerald-50/60 " +
-          (highlight ? "bg-emerald-50/40" : "")
+          "cursor-pointer border-b border-l-4 border-slate-100 transition hover:bg-emerald-50/60 " +
+          accent +
+          (open ? " bg-emerald-50/60" : "")
         }
       >
-        <td className="px-3 py-2 text-center text-base">{rank}</td>
-        <td className="px-2 py-2">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-800">
-            {standing.participant}
+        <td className="py-2.5 pl-3 pr-1 text-center align-middle">
+          <RankBadge index={index} />
+        </td>
+        <td className="px-2 py-2.5 align-middle">
+          <div className="flex items-center gap-1.5">
+            <span
+              className={
+                "truncate font-semibold text-slate-800 " + (podium ? "text-[15px]" : "")
+              }
+            >
+              {standing.participant}
+            </span>
             {standing.liveScored > 0 && (
-              <span className="inline-block h-2 w-2 rounded-full bg-red-500" title="Tiene puntos en vivo" />
+              <span
+                className="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-red-500"
+                title="Tiene puntos en vivo"
+              />
             )}
           </div>
-          <div className="text-xs text-slate-400">
-            {standing.scored} jugados · {standing.exact} exactos · {standing.outcomes} ganador
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-400">
+            <span>{standing.scored} jugados</span>
+            <span aria-hidden>·</span>
+            <span>{standing.exact} exactos</span>
+            <span aria-hidden>·</span>
+            <span>{standing.outcomes} ganador</span>
           </div>
         </td>
-        <td className="px-2 py-2 text-center text-slate-600">{standing.exact}</td>
-        <td className="px-3 py-2 text-right text-lg font-extrabold text-pitch-700">
-          {standing.points}
+        <td className="px-1 py-2.5 text-center align-middle tabular-nums text-slate-600">
+          {standing.exact}
+        </td>
+        <td className="py-2.5 pl-1 pr-3 text-right align-middle">
+          <span className="inline-flex min-w-[2.5rem] items-center justify-center rounded-lg bg-pitch-50 px-2 py-1 text-base font-extrabold tabular-nums text-pitch-700">
+            {standing.points}
+          </span>
         </td>
       </tr>
       {open && (
-        <tr className="bg-slate-50">
+        <tr className="border-b border-slate-100 bg-slate-50">
           <td colSpan={4} className="px-3 py-3">
             <Detail detail={standing.detail} results={results} />
           </td>
