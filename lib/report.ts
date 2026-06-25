@@ -2,7 +2,7 @@
 // tabla de posiciones), listo para compartir por WhatsApp. Función pura, sin
 // dependencias de servidor, así se puede usar tanto en /reporte como en /tabla.
 
-import { team, type TeamCode } from "@/lib/matches";
+import { team, matchById, type TeamCode } from "@/lib/matches";
 
 export const SITE = "https://polla-ganadora.vercel.app";
 
@@ -74,6 +74,78 @@ export function buildReportMessage(
   lines.push("");
   lines.push(`👉 ${SITE}/tabla`);
   return lines.join("\n");
+}
+
+// --- Pronósticos de los partidos EN JUEGO ahora ---
+
+export interface ReportLive {
+  match_id: string;
+  home: number; // marcador en vivo
+  away: number;
+  detail: string; // "45'", "HT", …
+}
+
+export interface ReportDetailRow {
+  match_id: string;
+  home: number; // predicción del participante
+  away: number;
+  pts: number;
+  label: string;
+  state: "final" | "live";
+}
+
+export interface ReportStandingDetail {
+  participant: string;
+  detail: ReportDetailRow[];
+}
+
+function ptsIcon(pts: number): string {
+  return pts >= 3 ? "🎯" : pts === 1 ? "✅" : "▪️";
+}
+
+/**
+ * Mensaje con el pronóstico de CADA participante para los partidos que están
+ * en juego en este momento. Soporta varios partidos a la vez. Devuelve "" si
+ * no hay nada en vivo.
+ */
+export function buildLiveMessage(
+  standings: ReportStandingDetail[],
+  live: ReportLive[]
+): string {
+  if (!live || live.length === 0) return "";
+
+  const blocks: string[] = ["🔴 *EN JUEGO AHORA* · Polla Ganadora", ""];
+
+  for (const lv of live) {
+    const m = matchById(lv.match_id);
+    if (!m) continue;
+    const h = team(m.home as TeamCode).name;
+    const a = team(m.away as TeamCode).name;
+    blocks.push(`⚽ *${h} ${lv.home}-${lv.away} ${a}*${lv.detail ? ` (${lv.detail})` : ""}`);
+
+    // Pronóstico de cada participante para este partido (los que ya lo tienen).
+    const picks = standings
+      .map((s) => {
+        const row = s.detail.find((d) => d.match_id === lv.match_id && d.state === "live");
+        return row
+          ? { name: s.participant, home: row.home, away: row.away, pts: row.pts }
+          : null;
+      })
+      .filter((p): p is { name: string; home: number; away: number; pts: number } => p !== null)
+      .sort((x, y) => y.pts - x.pts || x.name.localeCompare(y.name));
+
+    if (picks.length === 0) {
+      blocks.push("_Nadie pronosticó este partido._");
+    } else {
+      for (const p of picks) {
+        blocks.push(`${ptsIcon(p.pts)} ${p.name}: ${p.home}-${p.away} (+${p.pts})`);
+      }
+    }
+    blocks.push("");
+  }
+
+  blocks.push(`👉 ${SITE}/tabla`);
+  return blocks.join("\n");
 }
 
 /**

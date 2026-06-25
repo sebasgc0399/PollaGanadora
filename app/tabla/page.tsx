@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MATCHES, matchById, team, formatMatchDate, formatKickoffTime } from "@/lib/matches";
 import Flag from "@/components/Flag";
-import { buildReportMessage, shareReport, type ReportPending } from "@/lib/report";
+import { buildReportMessage, buildLiveMessage, shareReport, type ReportPending } from "@/lib/report";
 
 interface EffScore {
   home: number;
@@ -113,7 +113,17 @@ export default function TablaPage() {
             · {standings.length} participante{standings.length === 1 ? "" : "s"}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {live.length > 0 && (
+            <button
+              onClick={() => shareReport(buildLiveMessage(standings, live))}
+              disabled={loading}
+              title="Comparte el pronóstico de cada uno en los partidos en juego ahora"
+              className="inline-flex items-center gap-1.5 rounded-full bg-red-600 px-3.5 py-1.5 text-sm font-bold text-white shadow-sm transition hover:brightness-95 disabled:opacity-50"
+            >
+              🔴 En juego
+            </button>
+          )}
           <button
             onClick={() => shareReport(buildReportMessage(standings, pend))}
             disabled={loading || standings.length === 0}
