@@ -6,6 +6,8 @@ import type { ResultRow } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Lecturas siempre frescas: que cargar/guardar nunca use pronósticos cacheados.
+export const fetchCache = "force-no-store";
 
 function validGoals(n: unknown): n is number {
   return typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= 99;

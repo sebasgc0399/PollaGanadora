@@ -4,6 +4,9 @@ import { MATCHES, lockTimeMs } from "@/lib/matches";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
+const NO_STORE = { "Cache-Control": "no-store, max-age=0, must-revalidate" } as const;
 
 // Devuelve, para los partidos de HOY que aún se pueden pronosticar (no
 // bloqueados), qué participantes registrados todavía no han puesto su
@@ -56,12 +59,15 @@ export async function GET() {
     .filter((p) => p.missing > 0)
     .sort((a, b) => b.missing - a.missing || a.name.localeCompare(b.name));
 
-  return NextResponse.json({
-    ok: true,
-    today,
-    openCount: open.length,
-    openMatches: open.map((m) => ({ id: m.id, home: m.home, away: m.away })),
-    totalParticipants: participants.length,
-    pending,
-  });
+  return NextResponse.json(
+    {
+      ok: true,
+      today,
+      openCount: open.length,
+      openMatches: open.map((m) => ({ id: m.id, home: m.home, away: m.away })),
+      totalParticipants: participants.length,
+      pending,
+    },
+    { headers: NO_STORE }
+  );
 }

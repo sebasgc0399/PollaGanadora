@@ -8,6 +8,12 @@ import type { PredictionRow, ResultRow } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Anula cualquier caché del Data Cache de Next sobre las lecturas de Supabase:
+// si no, la tabla puede mostrar pronósticos viejos hasta que algo revalide.
+export const fetchCache = "force-no-store";
+
+// Cabeceras anti-caché para que ni el navegador ni un CDN reusen la respuesta.
+const NO_STORE = { "Cache-Control": "no-store, max-age=0, must-revalidate" } as const;
 
 // Supabase/PostgREST corta cada consulta en `max-rows` (1000 por defecto), así
 // que NO basta con `.range(0, 99999)`: hay que paginar. Con N participantes ×
@@ -132,12 +138,15 @@ export async function GET() {
 
   const finalCount = Object.values(effective).filter((e) => e.state === "final").length;
 
-  return NextResponse.json({
-    ok: true,
-    results: effective,
-    live: liveList,
-    liveCount: liveList.length,
-    finalCount,
-    standings,
-  });
+  return NextResponse.json(
+    {
+      ok: true,
+      results: effective,
+      live: liveList,
+      liveCount: liveList.length,
+      finalCount,
+      standings,
+    },
+    { headers: NO_STORE }
+  );
 }
