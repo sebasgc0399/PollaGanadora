@@ -343,6 +343,9 @@ export default function JugarPage() {
   const sections = useMemo(() => {
     const q = norm(search.trim());
     const passes = (m: Match) => {
+      // Ocultar las llaves de eliminatoria cuyos equipos aún no se definen
+      // ("Por definir"): despeja la lista. Reaparecen solas al asignar equipos.
+      if (isKnockout(m) && !teamsKnown(m, bracketTeams)) return false;
       if (q) {
         const hn = norm(sideInfo(m, "home", bracketTeams).label);
         const an = norm(sideInfo(m, "away", bracketTeams).label);
