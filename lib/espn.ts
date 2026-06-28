@@ -1,4 +1,4 @@
-import { MATCHES, TeamCode } from "@/lib/matches";
+import { MATCHES, matchById, isKnockout, type AssignedTeams, type TeamCode } from "@/lib/matches";
 
 // ---------------------------------------------------------------------------
 // Marcadores EN VIVO desde la API pública (no oficial) de ESPN.
@@ -29,30 +29,84 @@ function pairKey(a: string, b: string): string {
   return [a, b].sort().join("|");
 }
 
-const PAIR_TO_MATCH = new Map(MATCHES.map((m) => [pairKey(m.home, m.away), m]));
+type M = NonNullable<ReturnType<typeof matchById>>;
 
-let cache: { at: number; data: Record<string, LiveScore> } | null = null;
+// Pares de la fase de grupos (equipos fijos). En eliminatoria los equipos llegan
+// por asignación del admin, así que esos pares se agregan por llamada.
+const GROUP_PAIRS: [string, M][] = MATCHES.filter((m) => m.home && m.away).map(
+  (m) => [pairKey(m.home as TeamCode, m.away as TeamCode), m] as [string, M]
+);
 
-export async function fetchLiveScores(): Promise<Record<string, LiveScore>> {
-  if (cache && Date.now() - cache.at < TTL_MS) return cache.data;
+// Mapa par → lista de partidos. Casi siempre 1, pero un mismo par puede repetirse
+// si dos equipos se enfrentan en grupos y otra vez en una llave (revancha): ahí
+// guardamos ambos y desambiguamos por la fecha del evento al procesar.
+function buildPairMap(assigned?: AssignedTeams): Map<string, M[]> {
+  const map = new Map<string, M[]>();
+  const add = (key: string, m: M) => {
+    const arr = map.get(key);
+    if (arr) arr.push(m);
+    else map.set(key, [m]);
+  };
+  for (const [key, m] of GROUP_PAIRS) add(key, m);
+  if (assigned) {
+    for (const [id, t] of Object.entries(assigned)) {
+      const m = matchById(id);
+      if (!m || !isKnockout(m) || !t.home || !t.away) continue;
+      add(pairKey(t.home, t.away), m);
+    }
+  }
+  return map;
+}
+
+// Elige, entre los partidos que comparten un par, el más cercano a la fecha del
+// evento de ESPN (así una revancha grupos/eliminatoria no se confunde).
+function pickByDate(candidates: M[], eventDate?: string): M | undefined {
+  if (candidates.length <= 1) return candidates[0];
+  const t = eventDate ? new Date(eventDate).getTime() : NaN;
+  if (Number.isNaN(t)) return candidates[0];
+  return candidates.reduce((best, m) =>
+    Math.abs(new Date(m.kickoff).getTime() - t) < Math.abs(new Date(best.kickoff).getTime() - t)
+      ? m
+      : best
+  );
+}
+
+// Cacheamos la respuesta CRUDA de ESPN (no el resultado procesado) porque el
+// mapeo depende de los equipos de eliminatoria asignados, que pueden cambiar.
+let cache: { at: number; events: any[] } | null = null;
+
+async function fetchEvents(): Promise<any[]> {
+  if (cache && Date.now() - cache.at < TTL_MS) return cache.events;
+  const res = await fetch(SCOREBOARD, {
+    headers: { "User-Agent": "PollaGanadora/1.0 (+https://polla-ganadora.vercel.app)" },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("ESPN HTTP " + res.status);
+  const data = await res.json();
+  const events = data?.events ?? [];
+  cache = { at: Date.now(), events };
+  return events;
+}
+
+export async function fetchLiveScores(
+  assigned?: AssignedTeams
+): Promise<Record<string, LiveScore>> {
+  const pairToMatch = buildPairMap(assigned);
 
   try {
-    const res = await fetch(SCOREBOARD, {
-      headers: { "User-Agent": "PollaGanadora/1.0 (+https://polla-ganadora.vercel.app)" },
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error("ESPN HTTP " + res.status);
-    const data = await res.json();
+    const events = await fetchEvents();
 
     const out: Record<string, LiveScore> = {};
-    for (const e of data?.events ?? []) {
+    for (const e of events) {
       const comp = e?.competitions?.[0];
       const cs = comp?.competitors ?? [];
       if (cs.length !== 2) continue;
 
       const ha = cs[0]?.team?.abbreviation;
       const ab = cs[1]?.team?.abbreviation;
-      const match = PAIR_TO_MATCH.get(pairKey(ha, ab));
+      const candidates = pairToMatch.get(pairKey(ha, ab));
+      if (!candidates) continue;
+      const match = pickByDate(candidates, e?.date ?? comp?.date);
       if (!match) continue;
 
       const scoreBy: Record<string, number> = {};
@@ -76,8 +130,11 @@ export async function fetchLiveScores(): Promise<Record<string, LiveScore>> {
           : "pre";
       const detail: string = type.shortDetail ?? type.detail ?? "";
 
-      const home = scoreBy[match.home as TeamCode];
-      const away = scoreBy[match.away as TeamCode];
+      // Código del equipo local/visitante: fijo en grupos, asignado en eliminatoria.
+      const homeCode = (match.home ?? assigned?.[match.id]?.home) as TeamCode | undefined;
+      const awayCode = (match.away ?? assigned?.[match.id]?.away) as TeamCode | undefined;
+      const home = homeCode ? scoreBy[homeCode] : NaN;
+      const away = awayCode ? scoreBy[awayCode] : NaN;
 
       // Solo aceptamos enteros >= 0; cualquier otra cosa (NaN, negativos) hace
       // que el partido cuente como "pre" 0-0 y no se persista ni puntúe.
@@ -91,10 +148,9 @@ export async function fetchLiveScores(): Promise<Record<string, LiveScore>> {
       }
     }
 
-    cache = { at: Date.now(), data: out };
     return out;
   } catch {
-    // Resiliencia: si ESPN falla, devolvemos lo último que tuvimos (o vacío).
-    return cache?.data ?? {};
+    // Resiliencia: si ESPN falla, devolvemos vacío y la app sigue con `results`.
+    return {};
   }
 }

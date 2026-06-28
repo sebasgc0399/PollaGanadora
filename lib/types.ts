@@ -12,3 +12,11 @@ export interface ResultRow {
   home: number;
   away: number;
 }
+
+// Equipos asignados a una llave de la fase eliminatoria (los pone el admin).
+// home/away son códigos de equipo (TeamCode) o null si aún no se define.
+export interface BracketRow {
+  match_id: string;
+  home: string | null;
+  away: string | null;
+}

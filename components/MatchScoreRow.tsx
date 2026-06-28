@@ -1,7 +1,17 @@
 "use client";
 
 import { useRef } from "react";
-import { Match, team, formatMatchDate, formatKickoffTime } from "@/lib/matches";
+import {
+  Match,
+  isKnockout,
+  stageOf,
+  stageShort,
+  sideInfo,
+  formatMatchDate,
+  formatKickoffTime,
+  type AssignedTeams,
+  type SideInfo,
+} from "@/lib/matches";
 import Flag from "@/components/Flag";
 
 type Status = "saved" | "unsaved" | "incomplete" | null;
@@ -16,6 +26,47 @@ interface Props {
   urgent?: boolean; // cierra pronto → resaltar la cuenta regresiva
   status?: Status; // indicador guardado / sin guardar / incompleto
   footer?: React.ReactNode;
+  assigned?: AssignedTeams; // equipos asignados a las llaves de eliminatoria
+}
+
+// Muestra un lado del partido: bandera+nombre si se conoce el equipo, o un chip
+// con el placeholder (p.ej. "1° A", "Gana P73") si aún no se define.
+function Side({ info, align = "left" }: { info: SideInfo; align?: "left" | "right" }) {
+  const badge = info.known ? (
+    <Flag team={info.team!} width={26} />
+  ) : (
+    <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[3px] bg-slate-200 text-[11px] font-bold text-slate-500 ring-1 ring-black/10">
+      ?
+    </span>
+  );
+  const name = (
+    <span
+      className={
+        "truncate text-sm font-semibold sm:text-base " + (info.known ? "" : "text-slate-500")
+      }
+    >
+      {info.label}
+    </span>
+  );
+  return (
+    <div
+      className={
+        "flex min-w-0 items-center gap-2 " + (align === "right" ? "justify-end text-right" : "")
+      }
+    >
+      {align === "right" ? (
+        <>
+          {name}
+          {badge}
+        </>
+      ) : (
+        <>
+          {badge}
+          {name}
+        </>
+      )}
+    </div>
+  );
 }
 
 function clean(v: string): string {
@@ -35,9 +86,10 @@ export default function MatchScoreRow({
   urgent = false,
   status = null,
   footer,
+  assigned,
 }: Props) {
-  const h = team(match.home);
-  const a = team(match.away);
+  const h = sideInfo(match, "home", assigned);
+  const a = sideInfo(match, "away", assigned);
   const homeRef = useRef<HTMLInputElement>(null);
   const awayRef = useRef<HTMLInputElement>(null);
 
@@ -133,7 +185,7 @@ export default function MatchScoreRow({
       <div className="mb-2 flex items-center justify-between gap-2 text-xs text-slate-400">
         <span className="flex items-center gap-1.5">
           <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-500">
-            Grupo {match.group}
+            {isKnockout(match) ? stageShort(stageOf(match)) : `Grupo ${match.group}`}
           </span>
           {statusPill}
         </span>
@@ -156,21 +208,15 @@ export default function MatchScoreRow({
 
       {/* Fila de equipos */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <Flag team={h} width={26} />
-          <span className="truncate text-sm font-semibold sm:text-base">{h.name}</span>
-        </div>
-        <div className="flex min-w-0 items-center justify-end gap-2 text-right">
-          <span className="truncate text-sm font-semibold sm:text-base">{a.name}</span>
-          <Flag team={a} width={26} />
-        </div>
+        <Side info={h} align="left" />
+        <Side info={a} align="right" />
       </div>
 
       {/* Fila de marcadores (steppers) */}
       <div className="mt-2 flex items-center justify-center gap-2">
-        {stepper(home, setHome, homeRef, `Goles ${h.name}`, onHomeType)}
+        {stepper(home, setHome, homeRef, `Goles ${h.label}`, onHomeType)}
         <span className="px-1 text-lg font-bold text-slate-300">–</span>
-        {stepper(away, setAway, awayRef, `Goles ${a.name}`)}
+        {stepper(away, setAway, awayRef, `Goles ${a.label}`)}
       </div>
 
       {footer ? <div className="mt-2">{footer}</div> : null}

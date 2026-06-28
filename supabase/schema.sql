@@ -45,10 +45,20 @@ create table if not exists public.results (
   updated_at timestamptz not null default now()
 );
 
+-- Fase eliminatoria: equipos asignados a cada llave (los pone el admin a medida
+-- que se definen los cruces). home/away son códigos de equipo (texto) o NULL.
+create table if not exists public.brackets (
+  match_id   text primary key,
+  home       text,
+  away       text,
+  updated_at timestamptz not null default now()
+);
+
 -- RLS activado en todas.
 alter table public.participants enable row level security;
 alter table public.predictions  enable row level security;
 alter table public.results      enable row level security;
+alter table public.brackets     enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- Cerrar TODO acceso del rol anónimo: borramos cualquier política previa.
@@ -66,3 +76,4 @@ drop policy if exists "results_select"     on public.results;
 revoke all on public.participants from anon, authenticated;
 revoke all on public.predictions  from anon, authenticated;
 revoke all on public.results      from anon, authenticated;
+revoke all on public.brackets     from anon, authenticated;

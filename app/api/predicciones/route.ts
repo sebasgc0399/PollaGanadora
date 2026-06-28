@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient, isServerConfigured } from "@/lib/supabaseAdmin";
 import { hashClave, verifyClave, normalizeName } from "@/lib/auth";
-import { MATCHES, matchById, isMatchLocked } from "@/lib/matches";
+import { matchById, isMatchLocked, isKnockout, teamsKnown } from "@/lib/matches";
+import { fetchAssignedTeams } from "@/lib/bracket";
 import type { ResultRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -88,9 +89,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const [{ data: preds, error: prErr }, results] = await Promise.all([
+    const [{ data: preds, error: prErr }, results, bracketTeams] = await Promise.all([
       sb.from("predictions").select("match_id,home,away").eq("participant", name),
       fetchResultsMap(),
+      fetchAssignedTeams(sb),
     ]);
     if (prErr) {
       return NextResponse.json({ error: prErr.message }, { status: 500 });
@@ -99,7 +101,7 @@ export async function POST(req: NextRequest) {
     const predictions: Record<string, { home: number; away: number }> = {};
     (preds ?? []).forEach((r) => (predictions[r.match_id] = { home: r.home, away: r.away }));
 
-    return NextResponse.json({ ok: true, isNew, predictions, results });
+    return NextResponse.json({ ok: true, isNew, predictions, results, bracketTeams });
   }
 
   // ===================== GUARDAR =====================
@@ -115,7 +117,7 @@ export async function POST(req: NextRequest) {
     }
 
     const incoming = Array.isArray(body?.predictions) ? body.predictions : [];
-    const results = await fetchResultsMap();
+    const [results, assigned] = await Promise.all([fetchResultsMap(), fetchAssignedTeams(sb)]);
     const now = Date.now();
 
     const rows: { participant: string; match_id: string; home: number; away: number }[] = [];
@@ -130,6 +132,12 @@ export async function POST(req: NextRequest) {
       }
       if (!validGoals(p?.home) || !validGoals(p?.away)) {
         invalid++;
+        continue;
+      }
+      // En eliminatoria no se puede pronosticar hasta que los DOS equipos de la
+      // llave estén asignados (si no, "1°A vs 2°B" no tiene marcador real).
+      if (isKnockout(m) && !teamsKnown(m, assigned)) {
+        locked++;
         continue;
       }
       // Bloqueo validado en el SERVIDOR: ni el reloj del navegador ni una llamada

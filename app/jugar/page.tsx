@@ -6,8 +6,15 @@ import {
   lockTimeMs,
   formatRemaining,
   formatMatchDate,
-  team,
+  sideInfo,
+  isKnockout,
+  stageOf,
+  stageLabel,
+  stageShort,
+  teamsKnown,
+  STAGE_ORDER,
   type Match,
+  type AssignedTeams,
 } from "@/lib/matches";
 import MatchScoreRow from "@/components/MatchScoreRow";
 import Flag from "@/components/Flag";
@@ -36,6 +43,7 @@ export default function JugarPage() {
   const [stage, setStage] = useState<"login" | "form">("login");
   const [preds, setPreds] = useState<Record<string, Pred>>({});
   const [scores, setScores] = useState<Record<string, Score>>({});
+  const [bracketTeams, setBracketTeams] = useState<AssignedTeams>({});
   const [liveDetail, setLiveDetail] = useState<Record<string, string>>({});
   const [me, setMe] = useState<{ points: number; rank: number | null; total: number } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -82,6 +90,7 @@ export default function JugarPage() {
       const sc: Record<string, Score> = {};
       Object.entries(data.results ?? {}).forEach(([id, v]: any) => (sc[id] = v));
       setScores(sc);
+      if (data.bracketTeams) setBracketTeams(data.bracketTeams);
       const ld: Record<string, string> = {};
       (data.live ?? []).forEach((l: any) => (ld[l.match_id] = l.detail));
       setLiveDetail(ld);
@@ -135,6 +144,7 @@ export default function JugarPage() {
         snap[id] = `${v.home}-${v.away}`;
       });
       setPreds(pmap);
+      if (data.bracketTeams) setBracketTeams(data.bracketTeams);
       snapshot.current = snap;
       setSaveState("saved");
       try {
@@ -192,6 +202,13 @@ export default function JugarPage() {
     [scores, now]
   );
 
+  // En eliminatoria, una llave solo se puede pronosticar cuando sus DOS equipos
+  // ya están definidos. Mientras tanto se muestra como "Por definir".
+  const available = useCallback(
+    (m: Match) => !isKnockout(m) || teamsKnown(m, bracketTeams),
+    [bracketTeams]
+  );
+
   function setPred(id: string, home: string, away: string) {
     setPreds((p) => ({ ...p, [id]: { home, away } }));
   }
@@ -201,6 +218,7 @@ export default function JugarPage() {
     async (silent: boolean) => {
       const payload: { match_id: string; home: number; away: number }[] = [];
       for (const m of MATCHES) {
+        if (isKnockout(m) && !teamsKnown(m, bracketTeams)) continue;
         if (scores[m.id]?.state === "final" || Date.now() >= lockTimeMs(m)) continue;
         const p = preds[m.id];
         if (!p || p.home === "" || p.away === "") continue;
@@ -233,7 +251,7 @@ export default function JugarPage() {
         if (!silent) setMsg({ type: "err", text: e?.message ?? "No se pudo guardar." });
       }
     },
-    [preds, scores, name, clave]
+    [preds, scores, name, clave, bracketTeams]
   );
 
   // auto-guardado (debounced)
@@ -247,12 +265,13 @@ export default function JugarPage() {
   const hasUnsaved = useMemo(
     () =>
       MATCHES.some((m) => {
+        if (isKnockout(m) && !teamsKnown(m, bracketTeams)) return false;
         if (scores[m.id]?.state === "final" || now >= lockTimeMs(m)) return false;
         const p = preds[m.id];
         if (!p || p.home === "" || p.away === "") return false;
         return snapshot.current[m.id] !== `${p.home}-${p.away}`;
       }),
-    [preds, scores, now]
+    [preds, scores, now, bracketTeams]
   );
 
   // aviso al salir con cambios sin guardar
@@ -274,6 +293,7 @@ export default function JugarPage() {
     if (stage !== "form") return;
     const lost: string[] = [];
     for (const m of MATCHES) {
+      if (isKnockout(m) && !teamsKnown(m, bracketTeams)) continue;
       if (scores[m.id]?.state === "final") continue;
       if (now < lockTimeMs(m)) continue; // todavía editable
       if (lockWarned.current.has(m.id)) continue;
@@ -281,7 +301,9 @@ export default function JugarPage() {
       if (!p || p.home === "" || p.away === "") continue; // no había pronóstico completo
       if (snapshot.current[m.id] === `${p.home}-${p.away}`) continue; // ya estaba guardado
       lockWarned.current.add(m.id);
-      lost.push(`${team(m.home).name} vs ${team(m.away).name}`);
+      lost.push(
+        `${sideInfo(m, "home", bracketTeams).label} vs ${sideInfo(m, "away", bracketTeams).label}`
+      );
     }
     if (lost.length > 0) {
       setMsg({
@@ -289,21 +311,23 @@ export default function JugarPage() {
         text: `Se cerró ${lost.length === 1 ? "el partido" : "los partidos"} y no se alcanzó a guardar tu pronóstico de: ${lost.join(", ")}.`,
       });
     }
-  }, [now, stage, preds, scores]);
+  }, [now, stage, preds, scores, bracketTeams]);
 
   // ---------- derivados ----------
   const filledCount = useMemo(
     () => MATCHES.filter((m) => preds[m.id]?.home !== "" && preds[m.id]?.away !== "" && preds[m.id]).length,
     [preds]
   );
+  // Partidos que aún se pueden pronosticar (excluye llaves sin equipos definidos).
   const editableLeft = useMemo(
     () =>
       MATCHES.filter((m) => {
+        if (isKnockout(m) && !teamsKnown(m, bracketTeams)) return false;
         if (scores[m.id]?.state === "final" || now >= lockTimeMs(m)) return false;
         const p = preds[m.id];
         return !(p && p.home !== "" && p.away !== "");
       }).length,
-    [preds, scores, now]
+    [preds, scores, now, bracketTeams]
   );
 
   function matchStatus(m: Match): "saved" | "unsaved" | "incomplete" | null {
@@ -319,44 +343,73 @@ export default function JugarPage() {
   const sections = useMemo(() => {
     const q = norm(search.trim());
     const passes = (m: Match) => {
-      if (q && !(norm(team(m.home).name).includes(q) || norm(team(m.away).name).includes(q)))
-        return false;
+      if (q) {
+        const hn = norm(sideInfo(m, "home", bracketTeams).label);
+        const an = norm(sideInfo(m, "away", bracketTeams).label);
+        if (!(hn.includes(q) || an.includes(q))) return false;
+      }
       if (filter === "hoy") return m.date === today;
       if (filter === "pendientes") {
+        if (isKnockout(m) && !teamsKnown(m, bracketTeams)) return false;
         if (scores[m.id]?.state === "final" || now >= lockTimeMs(m)) return false;
         const p = preds[m.id];
         return !(p && p.home !== "" && p.away !== "");
       }
       return true;
     };
-    const map = new Map<string, { key: string; label: string; id: string; isToday: boolean; matches: Match[] }>();
+    const map = new Map<
+      string,
+      { key: string; label: string; id: string; isToday: boolean; order: number; matches: Match[] }
+    >();
     for (const m of MATCHES) {
       if (!passes(m)) continue;
-      let key: string, label: string, id: string, isToday = false;
+      const knockout = isKnockout(m);
+      let key: string, label: string, id: string, isToday = false, order = 0;
+      // Vista "Fase": grupos por letra, eliminatoria por ronda. Vista "Jornada"
+      // igual para eliminatoria (no tiene jornadas). Vista "Fecha": por día.
       if (view === "grupos") {
-        key = m.group;
-        label = `Grupo ${m.group}`;
-        id = `sec-${m.group}`;
+        if (knockout) {
+          const st = stageOf(m);
+          key = `stage-${st}`;
+          label = stageLabel(st);
+          id = `sec-${st}`;
+          order = 100 + STAGE_ORDER.indexOf(st);
+        } else {
+          key = m.group!;
+          label = `Grupo ${m.group}`;
+          id = `sec-${m.group}`;
+          order = m.group!.charCodeAt(0);
+        }
       } else if (view === "jornada") {
-        key = `J${m.matchday}`;
-        label = `Jornada ${m.matchday}`;
-        id = `sec-J${m.matchday}`;
+        if (knockout) {
+          const st = stageOf(m);
+          key = `stage-${st}`;
+          label = stageLabel(st);
+          id = `sec-${st}`;
+          order = 100 + STAGE_ORDER.indexOf(st);
+        } else {
+          key = `J${m.matchday}`;
+          label = `Jornada ${m.matchday}`;
+          id = `sec-J${m.matchday}`;
+          order = m.matchday!;
+        }
       } else {
         key = m.date;
         label = formatMatchDate(m.date);
         id = `sec-${m.date}`;
         isToday = m.date === today;
+        order = new Date(m.kickoff).getTime();
       }
-      if (!map.has(key)) map.set(key, { key, label, id, isToday, matches: [] });
+      if (!map.has(key)) map.set(key, { key, label, id, isToday, order, matches: [] });
       map.get(key)!.matches.push(m);
     }
     const arr = Array.from(map.values());
     arr.forEach((s) =>
       s.matches.sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime())
     );
-    if (view !== "fecha") arr.sort((a, b) => a.key.localeCompare(b.key));
+    arr.sort((a, b) => a.order - b.order);
     return arr;
-  }, [view, filter, search, preds, scores, now, today]);
+  }, [view, filter, search, preds, scores, now, today, bracketTeams]);
 
   function scrollToSection(id: string) {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -500,7 +553,7 @@ export default function JugarPage() {
               onChange={(v) => changeView(v as View)}
               options={[
                 ["fecha", "Fecha"],
-                ["grupos", "Grupos"],
+                ["grupos", "Fase"],
                 ["jornada", "Jornada"],
               ]}
             />
@@ -579,6 +632,14 @@ export default function JugarPage() {
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
               {s.matches.map((m) => {
                 const p = preds[m.id] ?? { home: "", away: "" };
+                // Llave de eliminatoria sin equipos definidos todavía.
+                if (!available(m)) {
+                  return (
+                    <div key={m.id} className="sm:col-span-2">
+                      <PendingMatchRow match={m} assigned={bracketTeams} />
+                    </div>
+                  );
+                }
                 const locked = isLocked(m);
                 if (locked) {
                   return (
@@ -588,6 +649,7 @@ export default function JugarPage() {
                         pred={p}
                         score={scores[m.id] ?? null}
                         detail={liveDetail[m.id]}
+                        assigned={bracketTeams}
                       />
                     </div>
                   );
@@ -603,6 +665,7 @@ export default function JugarPage() {
                     urgent={closes < 3 * 3600_000}
                     status={matchStatus(m)}
                     onChange={(hh, aa) => setPred(m.id, hh, aa)}
+                    assigned={bracketTeams}
                   />
                 );
               })}
@@ -683,19 +746,53 @@ function ptsBadge(pts: number) {
   );
 }
 
+// Banderita o chip "?" para un lado, en tamaño pequeño (filas compactas).
+function MiniSide({ info }: { info: ReturnType<typeof sideInfo> }) {
+  return info.known ? (
+    <Flag team={info.team!} width={16} />
+  ) : (
+    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[2px] bg-slate-200 text-[9px] font-bold text-slate-500 ring-1 ring-black/10">
+      ?
+    </span>
+  );
+}
+
+// Llave de eliminatoria cuyos equipos aún no se definen: solo informativa.
+function PendingMatchRow({ match, assigned }: { match: Match; assigned: AssignedTeams }) {
+  const h = sideInfo(match, "home", assigned);
+  const a = sideInfo(match, "away", assigned);
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs">
+      <span className="flex min-w-0 items-center gap-1.5 truncate text-slate-500">
+        <span className="rounded bg-slate-200 px-1.5 py-0.5 font-semibold text-slate-500">
+          {stageShort(stageOf(match))}
+        </span>
+        <span className="truncate">
+          {h.label} <span className="text-slate-300">vs</span> {a.label}
+        </span>
+      </span>
+      <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 font-medium text-slate-500">
+        Por definir
+      </span>
+    </div>
+  );
+}
+
 function LockedMatchRow({
   match,
   pred,
   score,
   detail,
+  assigned,
 }: {
   match: Match;
   pred: Pred;
   score: Score | null;
   detail?: string;
+  assigned?: AssignedTeams;
 }) {
-  const h = team(match.home);
-  const a = team(match.away);
+  const h = sideInfo(match, "home", assigned);
+  const a = sideInfo(match, "away", assigned);
   const hasPred = pred.home !== "" && pred.away !== "";
   const live = score?.state === "live";
   const pts =
@@ -704,11 +801,11 @@ function LockedMatchRow({
   return (
     <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
       <span className="flex min-w-0 items-center gap-1.5 truncate text-slate-600">
-        <Flag team={h} width={16} />
+        <MiniSide info={h} />
         <span className="truncate">
-          {h.name} <span className="text-slate-300">vs</span> {a.name}
+          {h.label} <span className="text-slate-300">vs</span> {a.label}
         </span>
-        <Flag team={a} width={16} />
+        <MiniSide info={a} />
       </span>
       <span className="flex shrink-0 items-center gap-1">
         {hasPred ? (

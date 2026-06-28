@@ -1,7 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MATCHES, matchById, team, formatMatchDate, formatKickoffTime } from "@/lib/matches";
+import {
+  MATCHES,
+  matchById,
+  sideInfo,
+  formatMatchDate,
+  formatKickoffTime,
+  type AssignedTeams,
+  type SideInfo,
+} from "@/lib/matches";
 import Flag from "@/components/Flag";
 import { buildReportMessage, buildLiveMessage, shareReport, type ReportPending } from "@/lib/report";
 
@@ -37,9 +45,24 @@ interface LiveItem {
 
 const REFRESH_MS = 45_000;
 
+// Banderita segura: usa la bandera del equipo si se conoce, o un chip "?" si la
+// llave de eliminatoria aún no tiene equipo asignado.
+function SideFlag({ info, width = 22 }: { info: SideInfo; width?: number }) {
+  if (info.known) return <Flag team={info.team!} width={width} />;
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center rounded-[3px] bg-slate-200 font-bold text-slate-500 ring-1 ring-black/10"
+      style={{ width, height: Math.round(width * 0.7), fontSize: Math.round(width * 0.42) }}
+    >
+      ?
+    </span>
+  );
+}
+
 export default function TablaPage() {
   const [standings, setStandings] = useState<Standing[]>([]);
   const [results, setResults] = useState<Record<string, EffScore>>({});
+  const [bracketTeams, setBracketTeams] = useState<AssignedTeams>({});
   const [live, setLive] = useState<LiveItem[]>([]);
   const [finalCount, setFinalCount] = useState(0);
   const [liveCount, setLiveCount] = useState(0);
@@ -67,6 +90,7 @@ export default function TablaPage() {
       if (!res.ok) throw new Error(data?.error ?? "Error cargando la tabla.");
       setStandings(data.standings ?? []);
       setResults(data.results ?? {});
+      setBracketTeams(data.bracketTeams ?? {});
       setLive(data.live ?? []);
       setFinalCount(data.finalCount ?? 0);
       setLiveCount(data.liveCount ?? 0);
@@ -123,7 +147,7 @@ export default function TablaPage() {
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           {live.length > 0 && (
             <button
-              onClick={() => shareReport(buildLiveMessage(standings, live))}
+              onClick={() => shareReport(buildLiveMessage(standings, live, bracketTeams))}
               disabled={loading}
               title="Comparte el pronóstico de cada uno en los partidos en juego ahora"
               className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-red-600 px-3.5 py-2 text-sm font-bold text-white shadow-sm transition hover:brightness-95 disabled:opacity-50 sm:flex-none"
@@ -170,16 +194,16 @@ export default function TablaPage() {
             {live.map((lv) => {
               const m = matchById(lv.match_id);
               if (!m) return null;
-              const h = team(m.home);
-              const a = team(m.away);
+              const h = sideInfo(m, "home", bracketTeams);
+              const a = sideInfo(m, "away", bracketTeams);
               return (
                 <div
                   key={lv.match_id}
                   className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 shadow-sm"
                 >
                   <div className="flex min-w-0 items-center gap-2">
-                    <Flag team={h} width={22} />
-                    <span className="truncate text-sm font-medium text-slate-700">{h.name}</span>
+                    <SideFlag info={h} />
+                    <span className="truncate text-sm font-medium text-slate-700">{h.label}</span>
                   </div>
                   <div className="flex shrink-0 flex-col items-center">
                     <span className="text-lg font-extrabold tabular-nums text-slate-800">
@@ -190,8 +214,8 @@ export default function TablaPage() {
                     </span>
                   </div>
                   <div className="flex min-w-0 items-center justify-end gap-2">
-                    <span className="truncate text-right text-sm font-medium text-slate-700">{a.name}</span>
-                    <Flag team={a} width={22} />
+                    <span className="truncate text-right text-sm font-medium text-slate-700">{a.label}</span>
+                    <SideFlag info={a} />
                   </div>
                 </div>
               );
@@ -199,7 +223,7 @@ export default function TablaPage() {
           </div>
         </div>
       ) : (
-        <NextMatchCard />
+        <NextMatchCard assigned={bracketTeams} />
       )}
 
       {!error && !loading && standings.length === 0 && (
@@ -236,6 +260,7 @@ export default function TablaPage() {
                     open={open}
                     onToggle={() => setExpanded(open ? null : s.participant)}
                     results={results}
+                    assigned={bracketTeams}
                   />
                 );
               })}
@@ -274,12 +299,14 @@ function FragmentRow({
   open,
   onToggle,
   results,
+  assigned,
 }: {
   standing: Standing;
   index: number;
   open: boolean;
   onToggle: () => void;
   results: Record<string, EffScore>;
+  assigned: AssignedTeams;
 }) {
   const podium = index < 3;
   const accent =
@@ -340,7 +367,7 @@ function FragmentRow({
       {open && (
         <tr className="border-b border-slate-100 bg-slate-50">
           <td colSpan={4} className="px-3 py-3">
-            <Detail detail={standing.detail} results={results} />
+            <Detail detail={standing.detail} results={results} assigned={assigned} />
           </td>
         </tr>
       )}
@@ -351,9 +378,11 @@ function FragmentRow({
 function Detail({
   detail,
   results,
+  assigned,
 }: {
   detail: DetailRow[];
   results: Record<string, EffScore>;
+  assigned: AssignedTeams;
 }) {
   if (!detail || detail.length === 0) {
     return (
@@ -382,8 +411,8 @@ function Detail({
           const m = matchById(d.match_id);
           const res = results[d.match_id];
           if (!m || !res) return null;
-          const h = team(m.home);
-          const a = team(m.away);
+          const h = sideInfo(m, "home", assigned);
+          const a = sideInfo(m, "away", assigned);
           const live = d.state === "live";
           return (
             <div
@@ -391,11 +420,11 @@ function Detail({
               className="flex flex-col gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs sm:flex-row sm:items-center sm:justify-between sm:gap-2"
             >
               <span className="flex min-w-0 items-center gap-1.5 text-slate-600">
-                <Flag team={h} width={16} />
+                <SideFlag info={h} width={16} />
                 <span className="truncate">
-                  {h.name} <span className="text-slate-300">vs</span> {a.name}
+                  {h.label} <span className="text-slate-300">vs</span> {a.label}
                 </span>
-                <Flag team={a} width={16} />
+                <SideFlag info={a} width={16} />
               </span>
               <span className="flex shrink-0 items-center gap-1 self-end sm:self-auto">
                 {/* Pronóstico: apagado (lo que dijiste) */}
@@ -449,7 +478,7 @@ function fmtCountdown(ms: number): string {
 // una cuenta regresiva en tiempo real hasta el pitazo. Ocupa el mismo lugar y
 // tamaño que la tarjeta EN VIVO. Tiene su propio tick para no re-renderizar la
 // tabla entera cada segundo.
-function NextMatchCard() {
+function NextMatchCard({ assigned }: { assigned: AssignedTeams }) {
   const [now, setNow] = useState(0);
   useEffect(() => {
     setNow(Date.now());
@@ -468,8 +497,8 @@ function NextMatchCard() {
 
   if (!now || !next) return null;
   const ms = new Date(next.kickoff).getTime() - now;
-  const h = team(next.home);
-  const a = team(next.away);
+  const h = sideInfo(next, "home", assigned);
+  const a = sideInfo(next, "away", assigned);
 
   return (
     <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
@@ -478,8 +507,8 @@ function NextMatchCard() {
       </div>
       <div className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 shadow-sm">
         <div className="flex min-w-0 items-center gap-2">
-          <Flag team={h} width={22} />
-          <span className="truncate text-sm font-medium text-slate-700">{h.name}</span>
+          <SideFlag info={h} />
+          <span className="truncate text-sm font-medium text-slate-700">{h.label}</span>
         </div>
         <div className="flex shrink-0 flex-col items-center px-1">
           <span className="text-lg font-extrabold tabular-nums text-pitch-700">
@@ -490,8 +519,8 @@ function NextMatchCard() {
           </span>
         </div>
         <div className="flex min-w-0 items-center justify-end gap-2">
-          <span className="truncate text-right text-sm font-medium text-slate-700">{a.name}</span>
-          <Flag team={a} width={22} />
+          <span className="truncate text-right text-sm font-medium text-slate-700">{a.label}</span>
+          <SideFlag info={a} />
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminClient, isServerConfigured } from "@/lib/supabaseAdmin";
-import { MATCHES, lockTimeMs } from "@/lib/matches";
+import { MATCHES, lockTimeMs, isKnockout, teamsKnown, sideInfo } from "@/lib/matches";
+import { fetchAssignedTeams } from "@/lib/bracket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,8 +33,16 @@ export async function GET() {
   const now = Date.now();
   const today = todayET();
 
-  // Partidos de hoy que aún se pueden pronosticar (falta para el cierre).
-  const open = MATCHES.filter((m) => m.date === today && lockTimeMs(m) > now);
+  const assigned = await fetchAssignedTeams(sb);
+
+  // Partidos de hoy que aún se pueden pronosticar (falta para el cierre). En
+  // eliminatoria solo cuentan los que ya tienen sus dos equipos definidos.
+  const open = MATCHES.filter(
+    (m) =>
+      m.date === today &&
+      lockTimeMs(m) > now &&
+      (!isKnockout(m) || teamsKnown(m, assigned))
+  );
   const openIds = open.map((m) => m.id);
 
   const [pRes, prRes] = await Promise.all([
@@ -64,7 +73,10 @@ export async function GET() {
       ok: true,
       today,
       openCount: open.length,
-      openMatches: open.map((m) => ({ id: m.id, home: m.home, away: m.away })),
+      openMatches: open.map((m) => ({
+        id: m.id,
+        label: `${sideInfo(m, "home", assigned).label} vs ${sideInfo(m, "away", assigned).label}`,
+      })),
       totalParticipants: participants.length,
       pending,
     },

@@ -41,9 +41,9 @@ export default function HomePage() {
           Polla Ganadora ⚽
         </h1>
         <p className="mt-3 max-w-prose text-emerald-50">
-          Predice el marcador de los {MATCHES.length} partidos de la fase de
-          grupos. No necesitas crear cuenta: pon tu nombre, llena tus
-          marcadores y compite por el primer puesto.
+          Predice el marcador de los {MATCHES.length} partidos del Mundial: fase
+          de grupos y toda la fase eliminatoria. No necesitas crear cuenta: pon
+          tu nombre, llena tus marcadores y compite por el primer puesto.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
