@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminClient, isServerConfigured } from "@/lib/supabaseAdmin";
 import { pointsFor, hitLabel } from "@/lib/scoring";
 import { fetchLiveScores } from "@/lib/espn";
+import { fetchAssignedTeams } from "@/lib/bracket";
 import { MATCHES } from "@/lib/matches";
 import type { PredictionRow, ResultRow } from "@/lib/types";
 
@@ -57,13 +58,16 @@ export async function GET() {
 
   const sb = getAdminClient();
   let allPreds: PredictionRow[];
-  let resRes, live;
+  let resRes, assigned, live;
   try {
-    [allPreds, resRes, live] = await Promise.all([
+    [allPreds, resRes, assigned] = await Promise.all([
       fetchAllPredictions(sb),
       sb.from("results").select("match_id,home,away"),
-      fetchLiveScores(),
+      fetchAssignedTeams(sb),
     ]);
+    // ESPN necesita los equipos de eliminatoria ya asignados para mapear esos
+    // partidos, así que se consulta después de tener `assigned`.
+    live = await fetchLiveScores(assigned);
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Error cargando predicciones." }, { status: 500 });
   }
@@ -146,6 +150,7 @@ export async function GET() {
       liveCount: liveList.length,
       finalCount,
       standings,
+      bracketTeams: assigned,
     },
     { headers: NO_STORE }
   );

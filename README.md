@@ -1,9 +1,16 @@
 # ⚽ Polla Ganadora · Mundial 2026
 
-Polla (quiniela) para la **fase de grupos del Mundial 2026**. Cada participante
-escribe su nombre + una clave personal y predice el marcador de los 72 partidos.
-A medida que se juegan, el administrador carga los resultados reales y la tabla
-de posiciones se calcula sola.
+Polla (quiniela) para **todo el Mundial 2026**: la fase de grupos y la fase
+eliminatoria completa (dieciseisavos → final). Cada participante escribe su
+nombre + una clave personal y predice el marcador de los **104 partidos**. A
+medida que se juegan, el administrador carga los resultados reales y la tabla de
+posiciones se calcula sola.
+
+> **Fase eliminatoria:** como los cruces dependen de cómo terminen los grupos,
+> esos 32 partidos arrancan con *placeholders* (`1° A`, `3° C/E/F/H/I`,
+> `Gana P73`…). El administrador asigna el equipo real de cada llave desde
+> `/admin` a medida que se definen; mientras una llave no tenga sus dos equipos,
+> no se puede pronosticar.
 
 **Sin cuentas de correo**: solo nombre + clave personal.
 
@@ -37,10 +44,11 @@ Diseñado para que **nadie haga trampa**:
 ## ✨ Páginas
 
 - **`/`** — Inicio con las reglas.
-- **`/jugar`** — Nombre + clave; predices los 72 marcadores. Editable hasta 1h
-  antes de cada partido.
+- **`/jugar`** — Nombre + clave; predices los 104 marcadores (grupos +
+  eliminatoria). Editable hasta 10 min antes de cada partido.
 - **`/tabla`** — Ranking en vivo. Toca un participante para ver su detalle.
-- **`/admin`** — Solo administrador (PIN): carga los resultados reales.
+- **`/admin`** — Solo administrador (PIN): carga los resultados reales y asigna
+  los equipos de las llaves de la fase eliminatoria.
 
 ## 🧱 Tecnología
 
@@ -101,11 +109,17 @@ Abre <http://localhost:3000>.
 
 ## 🛠️ Editar partidos y horarios
 
-Los 72 partidos y sus horarios están en [`lib/matches.ts`](lib/matches.ts). El
-campo `kickoff` es el pitazo inicial en **hora del Este (ET, UTC-04:00 en junio)**;
-de ahí se calcula el bloqueo de 10 min antes. Los horarios se cotejaron entre ESPN y
-worldcupwiki (best-effort): **verifícalos** y edita si la FIFA cambia algo. **No
-cambies los `id` (`m01`…`m72`)** de partidos que ya tengan datos guardados.
+Los 104 partidos y sus horarios están en [`lib/matches.ts`](lib/matches.ts). El
+campo `kickoff` es el pitazo inicial en **hora del Este (ET, UTC-04:00 en
+junio/julio)**; de ahí se calcula el bloqueo de 10 min antes. Los horarios se
+cotejaron entre ESPN y worldcupwiki (best-effort): **verifícalos** y edita si la
+FIFA cambia algo. **No cambies los `id` (`m01`…`m104`)** de partidos que ya tengan
+datos guardados.
+
+Los partidos de grupos (`m01`–`m72`) llevan equipos fijos. Los de eliminatoria
+(`m73`–`m104`) llevan `homeLabel`/`awayLabel` (placeholders del cruce) y sus
+equipos reales **no** se editan en este archivo: los asigna el admin desde
+`/admin` (se guardan en la tabla `brackets`).
 
 El minuto de cierre se ajusta con `LOCK_MINUTES_BEFORE` en ese mismo archivo.
 
@@ -115,6 +129,10 @@ El minuto de cierre se ajusta con `LOCK_MINUTES_BEFORE` en ese mismo archivo.
 2. Llena el marcador real de los partidos jugados → **Guardar resultados**.
 3. La tabla se actualiza sola. Para **borrar** un resultado, deja ese partido en
    blanco y guarda.
+4. **Fase eliminatoria**: en la sección de cada ronda, elige el equipo real de
+   cada llave en los selectores y dale **Guardar llaves (equipos)**. Recién ahí
+   esa llave queda disponible para pronosticar. Los marcadores se cargan igual
+   que en grupos.
 4. **Solicitudes de clave**: si alguien olvidó su clave, aparece aquí. Al
    **Aprobar**, se borra su clave (sus marcadores se conservan) y la persona
    vuelve a entrar con una clave nueva.
@@ -168,4 +186,5 @@ Define `CRON_SECRET` en Vercel para proteger el endpoint (si no lo defines,
   amigos). Si quieres más, se puede añadir rate-limiting.
 
 > Si actualizas desde una versión anterior, **vuelve a correr** `supabase/schema.sql`
-> (agrega la columna `reset_requested_at`, segura de re-ejecutar).
+> (agrega la columna `reset_requested_at` y la tabla `brackets` para la fase
+> eliminatoria; es seguro re-ejecutarlo).

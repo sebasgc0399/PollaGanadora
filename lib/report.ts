@@ -2,7 +2,7 @@
 // tabla de posiciones), listo para compartir por WhatsApp. Función pura, sin
 // dependencias de servidor, así se puede usar tanto en /reporte como en /tabla.
 
-import { team, matchById, type TeamCode } from "@/lib/matches";
+import { matchById, sideInfo, type AssignedTeams } from "@/lib/matches";
 
 export const SITE = "https://polla-ganadora.vercel.app";
 
@@ -14,7 +14,7 @@ export interface ReportStanding {
 export interface ReportPending {
   today: string; // YYYY-MM-DD (hora del Este)
   openCount: number;
-  openMatches: { id: string; home: string; away: string }[];
+  openMatches: { id: string; label: string }[]; // "Equipo A vs Equipo B" (ya resuelto)
   totalParticipants: number;
   pending: { name: string; missing: number }[];
 }
@@ -49,9 +49,7 @@ export function buildReportMessage(
       `✅ ¡Todos al día! Los ${pend.totalParticipants} ya pusieron sus pronósticos de hoy.`
     );
   } else {
-    const matchNames = pend.openMatches
-      .map((m) => `${team(m.home as TeamCode).name} vs ${team(m.away as TeamCode).name}`)
-      .join(", ");
+    const matchNames = pend.openMatches.map((m) => m.label).join(", ");
     lines.push(
       `⏳ *Faltan por pronosticar hoy* (${pend.openCount} partido${
         pend.openCount === 1 ? "" : "s"
@@ -110,7 +108,8 @@ function ptsIcon(pts: number): string {
  */
 export function buildLiveMessage(
   standings: ReportStandingDetail[],
-  live: ReportLive[]
+  live: ReportLive[],
+  assigned?: AssignedTeams
 ): string {
   if (!live || live.length === 0) return "";
 
@@ -119,8 +118,8 @@ export function buildLiveMessage(
   for (const lv of live) {
     const m = matchById(lv.match_id);
     if (!m) continue;
-    const h = team(m.home as TeamCode).name;
-    const a = team(m.away as TeamCode).name;
+    const h = sideInfo(m, "home", assigned).label;
+    const a = sideInfo(m, "away", assigned).label;
     blocks.push(`⚽ *${h} ${lv.home}-${lv.away} ${a}*${lv.detail ? ` (${lv.detail})` : ""}`);
 
     // Pronóstico de cada participante para este partido (los que ya lo tienen).

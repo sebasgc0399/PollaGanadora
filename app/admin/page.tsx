@@ -1,18 +1,37 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { MATCHES, GROUPS } from "@/lib/matches";
+import {
+  MATCHES,
+  GROUPS,
+  TEAMS,
+  STAGE_ORDER,
+  stageOf,
+  stageLabel,
+  isKnockout,
+  type TeamCode,
+  type AssignedTeams,
+} from "@/lib/matches";
 import MatchScoreRow from "@/components/MatchScoreRow";
 
 type Sc = { home: string; away: string };
 type Msg = { type: "ok" | "err" | "info"; text: string };
 
+// Equipos ordenados por nombre para los selectores de las llaves.
+const TEAM_OPTIONS = (Object.keys(TEAMS) as TeamCode[]).sort((a, b) =>
+  TEAMS[a].name.localeCompare(TEAMS[b].name)
+);
+// Etapas eliminatorias presentes en el fixture, en orden.
+const KO_STAGES = STAGE_ORDER.filter((s) => s !== "group");
+
 export default function AdminPage() {
   const [pin, setPin] = useState("");
   const [scores, setScores] = useState<Record<string, Sc>>({});
+  const [bracketTeams, setBracketTeams] = useState<AssignedTeams>({});
   const [initialIds, setInitialIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingTeams, setSavingTeams] = useState(false);
   const [msg, setMsg] = useState<Msg | null>(null);
   const [resetReqs, setResetReqs] = useState<{ name: string; reset_requested_at: string }[]>([]);
 
@@ -72,7 +91,10 @@ export default function AdminPage() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch("/api/resultados", { cache: "no-store" });
+      const [res, brRes] = await Promise.all([
+        fetch("/api/resultados", { cache: "no-store" }),
+        fetch("/api/bracket", { cache: "no-store" }),
+      ]);
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Error cargando resultados.");
       const map: Record<string, Sc> = {};
@@ -83,10 +105,53 @@ export default function AdminPage() {
       });
       setScores(map);
       setInitialIds(ids);
+      const brData = await brRes.json().catch(() => null);
+      if (brRes.ok && brData?.teams) setBracketTeams(brData.teams);
     } catch (e: any) {
       setMsg({ type: "err", text: e?.message ?? "Error cargando resultados." });
     } finally {
       setLoading(false);
+    }
+  }
+
+  function setTeam(id: string, side: "home" | "away", code: string) {
+    setBracketTeams((b) => ({
+      ...b,
+      [id]: { ...b[id], [side]: code ? (code as TeamCode) : null },
+    }));
+    setMsg(null);
+  }
+
+  async function saveBracket() {
+    if (!pin.trim()) {
+      setMsg({ type: "err", text: "Escribe el PIN de administrador." });
+      return;
+    }
+    setSavingTeams(true);
+    setMsg(null);
+    try {
+      try {
+        localStorage.setItem("pg_admin_pin", pin.trim());
+      } catch {
+        /* ignore */
+      }
+      const teams = MATCHES.filter(isKnockout).map((m) => ({
+        match_id: m.id,
+        home: bracketTeams[m.id]?.home ?? null,
+        away: bracketTeams[m.id]?.away ?? null,
+      }));
+      const res = await fetch("/api/bracket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: pin.trim(), teams }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "No se pudieron guardar las llaves.");
+      setMsg({ type: "ok", text: `Llaves guardadas (${data.saved} partidos actualizados).` });
+    } catch (e: any) {
+      setMsg({ type: "err", text: e?.message ?? "No se pudieron guardar las llaves." });
+    } finally {
+      setSavingTeams(false);
     }
   }
 
@@ -266,27 +331,90 @@ export default function AdminPage() {
       {loading ? (
         <p className="py-10 text-center text-slate-400">Cargando…</p>
       ) : (
-        GROUPS.map((g) => (
-          <section key={g}>
-            <h2 className="sticky top-[57px] z-10 -mx-4 bg-emerald-50/95 px-4 py-1.5 text-sm font-bold uppercase tracking-wide text-pitch-800 backdrop-blur">
-              Grupo {g}
-            </h2>
-            <div className="mt-2 space-y-2">
-              {MATCHES.filter((m) => m.group === g).map((m) => {
-                const s = scores[m.id] ?? { home: "", away: "" };
-                return (
-                  <MatchScoreRow
-                    key={m.id}
-                    match={m}
-                    home={s.home}
-                    away={s.away}
-                    onChange={(h, a) => setScore(m.id, h, a)}
-                  />
-                );
-              })}
-            </div>
-          </section>
-        ))
+        <>
+          {GROUPS.map((g) => (
+            <section key={g}>
+              <h2 className="sticky top-[57px] z-10 -mx-4 bg-emerald-50/95 px-4 py-1.5 text-sm font-bold uppercase tracking-wide text-pitch-800 backdrop-blur">
+                Grupo {g}
+              </h2>
+              <div className="mt-2 space-y-2">
+                {MATCHES.filter((m) => m.group === g).map((m) => {
+                  const s = scores[m.id] ?? { home: "", away: "" };
+                  return (
+                    <MatchScoreRow
+                      key={m.id}
+                      match={m}
+                      home={s.home}
+                      away={s.away}
+                      onChange={(h, a) => setScore(m.id, h, a)}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+
+          {/* ---------- Fase eliminatoria ---------- */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-800">
+            <strong>Fase eliminatoria.</strong> Asigna los equipos de cada llave a
+            medida que se definan los cruces y dale <em>Guardar llaves</em>. Mientras
+            una llave no tenga sus dos equipos, nadie puede pronosticarla. Los
+            marcadores se cargan igual que en grupos.
+          </div>
+
+          {KO_STAGES.map((st) => {
+            const ms = MATCHES.filter((m) => stageOf(m) === st);
+            if (ms.length === 0) return null;
+            return (
+              <section key={st}>
+                <h2 className="sticky top-[57px] z-10 -mx-4 bg-amber-50/95 px-4 py-1.5 text-sm font-bold uppercase tracking-wide text-amber-800 backdrop-blur">
+                  {stageLabel(st)}
+                </h2>
+                <div className="mt-2 space-y-3">
+                  {ms.map((m) => {
+                    const s = scores[m.id] ?? { home: "", away: "" };
+                    return (
+                      <div
+                        key={m.id}
+                        className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+                      >
+                        <div className="mb-2 grid grid-cols-2 gap-2">
+                          <TeamSelect
+                            label={m.homeLabel ?? "Local"}
+                            value={bracketTeams[m.id]?.home ?? ""}
+                            onChange={(c) => setTeam(m.id, "home", c)}
+                          />
+                          <TeamSelect
+                            label={m.awayLabel ?? "Visitante"}
+                            value={bracketTeams[m.id]?.away ?? ""}
+                            onChange={(c) => setTeam(m.id, "away", c)}
+                          />
+                        </div>
+                        <MatchScoreRow
+                          match={m}
+                          home={s.home}
+                          away={s.away}
+                          onChange={(h, a) => setScore(m.id, h, a)}
+                          assigned={bracketTeams}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+
+          <div className="flex justify-end">
+            <button
+              onClick={saveBracket}
+              disabled={savingTeams}
+              className="rounded-xl border border-amber-400 bg-amber-100 px-6 py-2.5 font-semibold text-amber-800 shadow-sm transition hover:bg-amber-200 disabled:opacity-60"
+            >
+              {savingTeams ? "Guardando…" : "Guardar llaves (equipos)"}
+            </button>
+          </div>
+        </>
       )}
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur">
@@ -302,5 +430,37 @@ export default function AdminPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Selector de equipo para una llave de eliminatoria. El placeholder (1°A, etc.)
+// se muestra como la opción "sin asignar".
+function TeamSelect({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (code: string) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="truncate text-[11px] font-medium uppercase tracking-wide text-slate-400">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm outline-none focus:border-pitch-600 focus:ring-2 focus:ring-pitch-600/30"
+      >
+        <option value="">— sin asignar —</option>
+        {TEAM_OPTIONS.map((code) => (
+          <option key={code} value={code}>
+            {TEAMS[code].name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

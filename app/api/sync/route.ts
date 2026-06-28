@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient, isServerConfigured } from "@/lib/supabaseAdmin";
 import { fetchLiveScores } from "@/lib/espn";
+import { fetchAssignedTeams } from "@/lib/bracket";
 import { MATCHES } from "@/lib/matches";
 
 export const runtime = "nodejs";
@@ -17,10 +18,11 @@ export const dynamic = "force-dynamic";
 
 async function runSync() {
   const sb = getAdminClient();
-  const [resRes, live] = await Promise.all([
+  const [resRes, assigned] = await Promise.all([
     sb.from("results").select("match_id"),
-    fetchLiveScores(),
+    fetchAssignedTeams(sb),
   ]);
+  const live = await fetchLiveScores(assigned);
   const have = new Set((resRes.data ?? []).map((r: { match_id: string }) => r.match_id));
 
   const toPersist = MATCHES.filter(
