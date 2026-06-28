@@ -207,10 +207,10 @@ export const MATCHES: Match[] = [
   { id: "m88", stage: "r32", date: "2026-07-03", kickoff: "2026-07-03T14:00:00-04:00", homeLabel: "2° D", awayLabel: "2° G" },
 
   // ---- Octavos / Ronda de 16 (4–7 jul) ----
-  { id: "m89", stage: "r16", date: "2026-07-04", kickoff: "2026-07-04T15:00:00-04:00", homeLabel: "Gana P74", awayLabel: "Gana P77" },
-  { id: "m90", stage: "r16", date: "2026-07-04", kickoff: "2026-07-04T19:00:00-04:00", homeLabel: "Gana P73", awayLabel: "Gana P75" },
-  { id: "m91", stage: "r16", date: "2026-07-05", kickoff: "2026-07-05T15:00:00-04:00", homeLabel: "Gana P76", awayLabel: "Gana P78" },
-  { id: "m92", stage: "r16", date: "2026-07-05", kickoff: "2026-07-05T19:00:00-04:00", homeLabel: "Gana P79", awayLabel: "Gana P80" },
+  { id: "m89", stage: "r16", date: "2026-07-04", kickoff: "2026-07-04T17:00:00-04:00", homeLabel: "Gana P74", awayLabel: "Gana P77" },
+  { id: "m90", stage: "r16", date: "2026-07-04", kickoff: "2026-07-04T13:00:00-04:00", homeLabel: "Gana P73", awayLabel: "Gana P75" },
+  { id: "m91", stage: "r16", date: "2026-07-05", kickoff: "2026-07-05T16:00:00-04:00", homeLabel: "Gana P76", awayLabel: "Gana P78" },
+  { id: "m92", stage: "r16", date: "2026-07-05", kickoff: "2026-07-05T20:00:00-04:00", homeLabel: "Gana P79", awayLabel: "Gana P80" },
   { id: "m93", stage: "r16", date: "2026-07-06", kickoff: "2026-07-06T15:00:00-04:00", homeLabel: "Gana P83", awayLabel: "Gana P84" },
   { id: "m94", stage: "r16", date: "2026-07-06", kickoff: "2026-07-06T19:00:00-04:00", homeLabel: "Gana P81", awayLabel: "Gana P82" },
   { id: "m95", stage: "r16", date: "2026-07-07", kickoff: "2026-07-07T15:00:00-04:00", homeLabel: "Gana P86", awayLabel: "Gana P88" },
