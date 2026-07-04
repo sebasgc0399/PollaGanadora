@@ -212,9 +212,9 @@ export const MATCHES: Match[] = [
   { id: "m91", stage: "r16", date: "2026-07-05", kickoff: "2026-07-05T16:00:00-04:00", homeLabel: "Gana P76", awayLabel: "Gana P78" },
   { id: "m92", stage: "r16", date: "2026-07-05", kickoff: "2026-07-05T20:00:00-04:00", homeLabel: "Gana P79", awayLabel: "Gana P80" },
   { id: "m93", stage: "r16", date: "2026-07-06", kickoff: "2026-07-06T15:00:00-04:00", homeLabel: "Gana P83", awayLabel: "Gana P84" },
-  { id: "m94", stage: "r16", date: "2026-07-06", kickoff: "2026-07-06T19:00:00-04:00", homeLabel: "Gana P81", awayLabel: "Gana P82" },
-  { id: "m95", stage: "r16", date: "2026-07-07", kickoff: "2026-07-07T15:00:00-04:00", homeLabel: "Gana P86", awayLabel: "Gana P88" },
-  { id: "m96", stage: "r16", date: "2026-07-07", kickoff: "2026-07-07T19:00:00-04:00", homeLabel: "Gana P85", awayLabel: "Gana P87" },
+  { id: "m94", stage: "r16", date: "2026-07-06", kickoff: "2026-07-06T20:00:00-04:00", homeLabel: "Gana P81", awayLabel: "Gana P82" },
+  { id: "m95", stage: "r16", date: "2026-07-07", kickoff: "2026-07-07T12:00:00-04:00", homeLabel: "Gana P86", awayLabel: "Gana P88" },
+  { id: "m96", stage: "r16", date: "2026-07-07", kickoff: "2026-07-07T16:00:00-04:00", homeLabel: "Gana P85", awayLabel: "Gana P87" },
 
   // ---- Cuartos de final (9–11 jul) ----
   { id: "m97", stage: "qf", date: "2026-07-09", kickoff: "2026-07-09T16:00:00-04:00", homeLabel: "Gana P89", awayLabel: "Gana P90" },
