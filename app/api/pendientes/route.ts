@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminClient, isServerConfigured } from "@/lib/supabaseAdmin";
 import { MATCHES, lockTimeMs, isKnockout, teamsKnown, sideInfo } from "@/lib/matches";
-import { fetchAssignedTeams } from "@/lib/bracket";
+import { fetchEffectiveTeams } from "@/lib/bracket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export async function GET() {
   const now = Date.now();
   const today = todayET();
 
-  const assigned = await fetchAssignedTeams(sb);
+  const assigned = await fetchEffectiveTeams(sb);
 
   // Partidos de hoy que aún se pueden pronosticar (falta para el cierre). En
   // eliminatoria solo cuentan los que ya tienen sus dos equipos definidos.

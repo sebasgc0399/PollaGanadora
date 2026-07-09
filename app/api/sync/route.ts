@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient, isServerConfigured } from "@/lib/supabaseAdmin";
 import { fetchLiveScores } from "@/lib/espn";
-import { fetchAssignedTeams } from "@/lib/bracket";
+import { fetchEffectiveTeams } from "@/lib/bracket";
 import { MATCHES } from "@/lib/matches";
 
 export const runtime = "nodejs";
@@ -20,7 +20,7 @@ async function runSync() {
   const sb = getAdminClient();
   const [resRes, assigned] = await Promise.all([
     sb.from("results").select("match_id"),
-    fetchAssignedTeams(sb),
+    fetchEffectiveTeams(sb),
   ]);
   const live = await fetchLiveScores(assigned);
   const have = new Set((resRes.data ?? []).map((r: { match_id: string }) => r.match_id));

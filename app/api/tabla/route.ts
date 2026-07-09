@@ -4,6 +4,7 @@ import { getAdminClient, isServerConfigured } from "@/lib/supabaseAdmin";
 import { pointsFor, hitLabel } from "@/lib/scoring";
 import { fetchLiveScores } from "@/lib/espn";
 import { fetchAssignedTeams } from "@/lib/bracket";
+import { resolveBracket } from "@/lib/knockout";
 import { MATCHES } from "@/lib/matches";
 import type { PredictionRow, ResultRow } from "@/lib/types";
 
@@ -58,16 +59,13 @@ export async function GET() {
 
   const sb = getAdminClient();
   let allPreds: PredictionRow[];
-  let resRes, assigned, live;
+  let resRes, assigned;
   try {
     [allPreds, resRes, assigned] = await Promise.all([
       fetchAllPredictions(sb),
       sb.from("results").select("match_id,home,away"),
       fetchAssignedTeams(sb),
     ]);
-    // ESPN necesita los equipos de eliminatoria ya asignados para mapear esos
-    // partidos, así que se consulta después de tener `assigned`.
-    live = await fetchLiveScores(assigned);
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Error cargando predicciones." }, { status: 500 });
   }
@@ -75,6 +73,12 @@ export async function GET() {
 
   const dbResults: Record<string, ResultRow> = {};
   (resRes.data ?? []).forEach((r: ResultRow) => (dbResults[r.match_id] = r));
+
+  // Equipos EFECTIVOS de las llaves: los asignados a mano + los que se derivan
+  // de los resultados (octavos→final avanzan solos). ESPN los necesita para
+  // mapear los partidos de eliminatoria, así que se resuelven antes de consultarlo.
+  let effectiveTeams = resolveBracket(assigned, dbResults);
+  const live = await fetchLiveScores(effectiveTeams);
 
   // Auto-guardar en la base los partidos que ESPN ya da por FINALIZADOS y que
   // aún no estaban (idempotente: solo una vez por partido). El admin puede
@@ -85,7 +89,11 @@ export async function GET() {
   if (toPersist.length > 0) {
     const { error } = await sb.from("results").upsert(toPersist, { onConflict: "match_id" });
     if (error) console.error("tabla: no se pudieron persistir resultados finales:", error.message);
-    else toPersist.forEach((r) => (dbResults[r.match_id] = r));
+    else {
+      toPersist.forEach((r) => (dbResults[r.match_id] = r));
+      // Un resultado recién persistido puede definir la llave siguiente.
+      effectiveTeams = resolveBracket(assigned, dbResults);
+    }
   }
 
   // Marcador EFECTIVO por partido: la base (admin/auto) manda; si no, lo EN VIVO.
@@ -150,7 +158,7 @@ export async function GET() {
       liveCount: liveList.length,
       finalCount,
       standings,
-      bracketTeams: assigned,
+      bracketTeams: effectiveTeams,
     },
     { headers: NO_STORE }
   );
