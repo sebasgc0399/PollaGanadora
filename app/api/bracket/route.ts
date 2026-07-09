@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient, isServerConfigured } from "@/lib/supabaseAdmin";
-import { fetchAssignedTeams } from "@/lib/bracket";
+import { fetchEffectiveTeams } from "@/lib/bracket";
 import { matchById, isKnockout, TEAMS } from "@/lib/matches";
 
 export const runtime = "nodejs";
@@ -23,7 +23,7 @@ export async function GET() {
   }
   try {
     const sb = getAdminClient();
-    const teams = await fetchAssignedTeams(sb);
+    const teams = await fetchEffectiveTeams(sb);
     return NextResponse.json({ ok: true, teams }, { headers: NO_STORE });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Error." }, { status: 500 });

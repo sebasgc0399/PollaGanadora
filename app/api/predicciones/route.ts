@@ -3,6 +3,7 @@ import { getAdminClient, isServerConfigured } from "@/lib/supabaseAdmin";
 import { hashClave, verifyClave, normalizeName } from "@/lib/auth";
 import { matchById, isMatchLocked, isKnockout, teamsKnown } from "@/lib/matches";
 import { fetchAssignedTeams } from "@/lib/bracket";
+import { resolveBracket } from "@/lib/knockout";
 import type { ResultRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const [{ data: preds, error: prErr }, results, bracketTeams] = await Promise.all([
+    const [{ data: preds, error: prErr }, results, assigned] = await Promise.all([
       sb.from("predictions").select("match_id,home,away").eq("participant", name),
       fetchResultsMap(),
       fetchAssignedTeams(sb),
@@ -101,6 +102,7 @@ export async function POST(req: NextRequest) {
     const predictions: Record<string, { home: number; away: number }> = {};
     (preds ?? []).forEach((r) => (predictions[r.match_id] = { home: r.home, away: r.away }));
 
+    const bracketTeams = resolveBracket(assigned, results);
     return NextResponse.json({ ok: true, isNew, predictions, results, bracketTeams });
   }
 
@@ -118,6 +120,7 @@ export async function POST(req: NextRequest) {
 
     const incoming = Array.isArray(body?.predictions) ? body.predictions : [];
     const [results, assigned] = await Promise.all([fetchResultsMap(), fetchAssignedTeams(sb)]);
+    const effectiveTeams = resolveBracket(assigned, results);
     const now = Date.now();
 
     const rows: { participant: string; match_id: string; home: number; away: number }[] = [];
@@ -136,7 +139,7 @@ export async function POST(req: NextRequest) {
       }
       // En eliminatoria no se puede pronosticar hasta que los DOS equipos de la
       // llave estén asignados (si no, "1°A vs 2°B" no tiene marcador real).
-      if (isKnockout(m) && !teamsKnown(m, assigned)) {
+      if (isKnockout(m) && !teamsKnown(m, effectiveTeams)) {
         locked++;
         continue;
       }
